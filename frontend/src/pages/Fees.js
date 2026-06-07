@@ -214,6 +214,21 @@ export default function Fees() {
   return (
     <div style={{ display:'flex', flexWrap: 'wrap', gap:'20px', minHeight:'calc(100vh - 120px)' }}>
 
+      {/* ✅ CSS to hide scrollbar on mobile when a student is selected */}
+      <style>
+        {`
+          @media (max-width: 768px) {
+            .mobile-details-scroll::-webkit-scrollbar {
+              display: none !important;
+            }
+            .mobile-details-scroll {
+              -ms-overflow-style: none !important;
+              scrollbar-width: none !important;
+            }
+          }
+        `}
+      </style>
+
       {/* LEFT PANEL — Students List (Hidden for Student Role) */}
       {!isStudentOrParent && (
       <div style={{
@@ -561,7 +576,10 @@ export default function Fees() {
                   <p>{studentFees.length === 0 ? 'No fee records found for this student' : 'No records match the filter'}</p>
                 </div>
               ) : (
-                <div style={{ overflowY:'auto', flex:1 }}>
+                <div 
+                  className={selectedStudent ? "mobile-details-scroll" : ""} 
+                  style={{ overflowY:'auto', flex:1 }}
+                >
                   <table style={{ width:'100%', borderCollapse:'collapse', fontSize:'14px' }}>
                     <thead style={{ position:'sticky', top:0, background:'var(--surface)', zIndex:1 }}>
                       <tr><th style={{ padding:'11px 16px', textAlign:'left', fontSize:'11px', fontWeight:'600', textTransform:'uppercase', letterSpacing:'0.5px', color:'var(--muted)', borderBottom:'1px solid var(--border)' }}>Month</th><th style={{ padding:'11px 16px', textAlign:'left', fontSize:'11px', fontWeight:'600', textTransform:'uppercase', letterSpacing:'0.5px', color:'var(--muted)', borderBottom:'1px solid var(--border)' }}>Fee Type</th><th style={{ padding:'11px 16px', textAlign:'left', fontSize:'11px', fontWeight:'600', textTransform:'uppercase', letterSpacing:'0.5px', color:'var(--muted)', borderBottom:'1px solid var(--border)' }}>Method</th><th style={{ padding:'11px 16px', textAlign:'left', fontSize:'11px', fontWeight:'600', textTransform:'uppercase', letterSpacing:'0.5px', color:'var(--muted)', borderBottom:'1px solid var(--border)' }}>Amount</th><th style={{ padding:'11px 16px', textAlign:'left', fontSize:'11px', fontWeight:'600', textTransform:'uppercase', letterSpacing:'0.5px', color:'var(--muted)', borderBottom:'1px solid var(--border)' }}>Due Date</th><th style={{ padding:'11px 16px', textAlign:'left', fontSize:'11px', fontWeight:'600', textTransform:'uppercase', letterSpacing:'0.5px', color:'var(--muted)', borderBottom:'1px solid var(--border)' }}>Status</th>{user?.role?.toLowerCase() === 'admin' && (<th style={{ padding:'11px 16px', textAlign:'left', fontSize:'11px', fontWeight:'600', textTransform:'uppercase', letterSpacing:'0.5px', color:'var(--muted)', borderBottom:'1px solid var(--border)' }}>Action</th>)}</tr>
