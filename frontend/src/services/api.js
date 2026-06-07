@@ -1,6 +1,7 @@
 // API BASE URL - Proxy use karo
-const API_BASE_URL = 'http://localhost:5000/api';
-const BACKEND_URL = 'http://127.0.0.1:5000/api'; // Use IP instead of localhost
+// ✅ Change this to use environment variable or your Render URL
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5005/api';
+const BACKEND_URL = API_BASE_URL;
 
 // Helper function with error handling
 const apiCall = async (endpoint, options = {}) => {
