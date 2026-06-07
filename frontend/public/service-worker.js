@@ -1,28 +1,19 @@
-const CACHE_NAME = 'school-app-v1';
-const urlsToCache = [
-  '/',
-  '/index.html',
-  '/favicon.ico',
-  '/static/js/main.chunk.js',
-  '/static/css/main.chunk.css'
-];
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import App from './App';
 
-self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then((cache) => {
-        return cache.addAll(urlsToCache).catch(err => {
-          console.log('Some assets failed to cache:', err);
-        });
+// Service Worker Registration
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/service-worker.js')
+      .then((registration) => {
+        console.log('SW registered:', registration);
       })
-  );
-  self.skipWaiting();
-});
+      .catch((error) => {
+        console.log('SW registration failed:', error);
+      });
+  });
+}
 
-self.addEventListener('fetch', (event) => {
-  event.respondWith(
-    fetch(event.request).catch(() => {
-      return caches.match(event.request);
-    })
-  );
-});
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<App />);
