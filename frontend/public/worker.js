@@ -2,7 +2,6 @@ const CACHE_NAME = 'school-app-v1';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
-  '/favicon.ico',
   '/static/js/main.chunk.js',
   '/static/css/main.chunk.css'
 ];

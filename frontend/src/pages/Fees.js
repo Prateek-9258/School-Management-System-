@@ -218,13 +218,10 @@ export default function Fees() {
       <style>
         {`
           @media (max-width: 768px) {
-            .mobile-details-scroll::-webkit-scrollbar {
-              display: none !important;
-            }
-            .mobile-details-scroll {
-              -ms-overflow-style: none !important;
-              scrollbar-width: none !important;
-            }
+            ${selectedStudent ? `
+              .no-scrollbar-mobile::-webkit-scrollbar { display: none !important; }
+              .no-scrollbar-mobile { -ms-overflow-style: none !important; scrollbar-width: none !important; }
+            ` : ''}
           }
         `}
       </style>
@@ -273,7 +270,10 @@ export default function Fees() {
           </select>
         </div>
 
-        <div style={{ flex:1, overflowY:'auto' }}>
+        <div 
+          style={{ flex:1, overflowY:'auto' }} 
+          className={selectedStudent ? "no-scrollbar-mobile" : ""}
+        >
           {loadingStudents ? (
             <div style={{ padding:'20px', textAlign:'center', color:'var(--muted)', fontSize:'13px' }}>
               Loading...
@@ -577,7 +577,7 @@ export default function Fees() {
                 </div>
               ) : (
                 <div 
-                  className={selectedStudent ? "mobile-details-scroll" : ""} 
+                  className={selectedStudent ? "no-scrollbar-mobile" : ""} 
                   style={{ overflowY:'auto', flex:1 }}
                 >
                   <table style={{ width:'100%', borderCollapse:'collapse', fontSize:'14px' }}>
