@@ -1,6 +1,7 @@
 // API BASE URL - Proxy use karo
 // ✅ Change this to use environment variable or your Render URL
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5005/api';
+// const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5005/api';
+const API_BASE_URL = 'https://school-management-system-dszc.onrender.com/api';
 const BACKEND_URL = API_BASE_URL;
 
 // Helper function with error handling

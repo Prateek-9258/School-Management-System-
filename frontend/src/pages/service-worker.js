@@ -1,6 +1,6 @@
 // EduSync Basic Service Worker
 const CACHE_NAME = 'edusync-cache-v1';
-const urlsToCache = ['/', '/index.html'];
+const urlsToCache = ['/', '/index.html', '/favicon.ico'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
