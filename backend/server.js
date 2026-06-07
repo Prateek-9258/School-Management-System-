@@ -2,25 +2,14 @@ const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
 const path = require('path');
+const fs = require('fs');
 require('dotenv').config();
 
 const app = express();
 
-// ✅ CORS - Production + Local
-const allowedOrigins = [
-  'http://localhost:3000',
-  'http://127.0.0.1:3000',
-  'https://your-frontend.onrender.com'  // Baad me update karna
-];
-
+// ✅ CORS - Sabko allow karo (Production ke liye baad me restrict kar lena)
 app.use(cors({
-  origin: function(origin, callback) {
-    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
-      callback(null, true);
-    } else {
-      callback(null, true); // Development me sabko allow
-    }
-  },
+  origin: '*',
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
@@ -39,28 +28,37 @@ mongoose.connect(process.env.MONGODB_URI, {
 .then(() => console.log('✅ MongoDB Atlas Connected'))
 .catch(err => console.error('❌ MongoDB Error:', err.message));
 
-// ✅ Routes - Check karo ye files exist karte hain
-const routes = [
-  { path: '/api/auth', module: './routes/auth' },
-  { path: '/api/students', module: './routes/students' },
-  { path: '/api/attendance', module: './routes/attendance' },
-  { path: '/api/fees', module: './routes/fees' },
-  { path: '/api/notifications', module: './routes/notifications' },
-  { path: '/api/announcements', module: './routes/announcements' },
-  { path: '/api/export', module: './routes/export' },
-  { path: '/api/import', module: './routes/importRoutes' },
-];
+// ✅ Dynamic Route Loading - Sirf jo files exist karti hain
+const routesDir = path.join(__dirname, 'routes');
 
-routes.forEach(route => {
-  try {
-    app.use(route.path, require(route.module));
-    console.log(`✅ Route loaded: ${route.path}`);
-  } catch (err) {
-    console.error(`❌ Route failed: ${route.path} - ${err.message}`);
+fs.readdirSync(routesDir).forEach(file => {
+  if (file.endsWith('.js')) {
+    const routeName = file.replace('.js', '');
+    let routePath;
+    
+    // Route path decide karo
+    if (routeName === 'auth') routePath = '/api/auth';
+    else if (routeName === 'students') routePath = '/api/students';
+    else if (routeName === 'attendance') routePath = '/api/attendance';
+    else if (routeName === 'fees') routePath = '/api/fees';
+    else if (routeName === 'notifications') routePath = '/api/notifications';
+    else if (routeName === 'announcements') routePath = '/api/announcements';
+    else if (routeName === 'export') routePath = '/api/export';
+    else if (routeName === 'importRoutes') routePath = '/api/import';
+    else routePath = `/api/${routeName}`;
+    
+    try {
+      app.use(routePath, require(`./routes/${file}`));
+      console.log(`✅ Route loaded: ${routePath} → ${file}`);
+    } catch (err) {
+      console.error(`❌ Route failed: ${routePath} → ${file} - ${err.message}`);
+    }
   }
 });
 
+// ✅ Port
 const PORT = process.env.PORT || 10000;
+
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
