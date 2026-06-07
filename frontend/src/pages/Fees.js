@@ -393,13 +393,14 @@ export default function Fees() {
                   {pendingFees.slice(0, 6).map(fee => (
                     <div key={fee._id} style={{ 
                       display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                      padding: '12px 16px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: '12px'
+                      padding: '12px 16px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: '12px',
+                      flexWrap: 'wrap', gap: '10px'
                     }}>
                       <div>
                         <div style={{ fontWeight: '600', fontSize: '14px' }}>{fee?.studentId?.name}</div>
                         <div style={{ fontSize: '11px', color: 'var(--accent)', fontWeight: '600' }}>{(fee.type || 'Fee')} — {fee.month}</div>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginLeft: 'auto' }}>
                         <div style={{ textAlign: 'right' }}>
                           <div style={{ fontWeight: '800', color: 'var(--red)', fontSize: '15px' }}>₹{fee.amount}</div>
                           <div style={{ fontSize: '11px', color: 'var(--muted)' }}>Due: {(fee.dueDate || fee.date) ? new Date(fee.dueDate || fee.date).toLocaleDateString('en-IN') : 'N/A'}</div>
@@ -438,7 +439,7 @@ export default function Fees() {
                   {selectedStudent.parentName && `Parent: ${selectedStudent.parentName}`}
                 </div>
               </div>
-              <div style={{ display: 'flex', gap: '10px' }}>
+              <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                 {/* ✅ NEW: Export PDF Button */}
                 <button 
                   onClick={() => exportFeesPDF(selectedStudent._id)}
@@ -479,7 +480,7 @@ export default function Fees() {
             </div>
 
             <div style={{
-              display:'grid', gridTemplateColumns:'repeat(3,1fr)',
+              display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(120px, 1fr))',
               gap:'12px', marginBottom:'16px'
             }}>
               {[
