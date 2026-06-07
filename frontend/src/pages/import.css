@@ -1,0 +1,54 @@
+.import-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--surface2);
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+}
+
+.import-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.import-input {
+  font-size: 12px;
+  color: var(--muted);
+  max-width: 200px;
+}
+
+.import-input::file-selector-button {
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface1);
+  color: var(--text);
+  cursor: pointer;
+  font-family: inherit;
+  margin-right: 10px;
+  transition: all 0.2s;
+}
+
+.import-input::file-selector-button:hover {
+  background: var(--border);
+}
+
+.import-btn {
+  padding: 7px 14px;
+  border-radius: 8px;
+  border: none;
+  background: var(--accent);
+  color: white;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.import-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.import-msg { margin: 0; font-size: 12px; font-weight: 500; }
+.import-msg.error { color: var(--red); }
+.import-msg.success { color: var(--green); }

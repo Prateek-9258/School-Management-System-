@@ -1,0 +1,106 @@
+/* Toolbar & Search Styles */
+.toolbar {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.search-box {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0 14px;
+  flex: 1;
+  min-width: 260px;
+  transition: all 0.2s ease;
+}
+
+.search-box span {
+  font-size: 14px;
+  opacity: 0.6;
+  user-select: none;
+}
+
+.search-box input {
+  border: none !important;
+  background: transparent !important;
+  padding: 10px 0;
+  color: var(--text);
+  font-size: 14px;
+  width: 100%;
+  outline: none;
+}
+
+.search-box:focus-within {
+  border-color: var(--accent);
+  background: var(--surface);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.filter-select {
+  padding: 10px 14px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text);
+  font-size: 14px;
+  outline: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 150px;
+}
+
+/* Table row hover feedback */
+.table-wrap tbody tr {
+  transition: background-color 0.2s ease;
+}
+
+.table-wrap tbody tr:hover {
+  background-color: var(--surface2);
+}
+
+/* Action buttons hover effects */
+.btn {
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.btn-primary:hover:not(:disabled) {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.btn-ghost:hover:not(:disabled) {
+  background-color: rgba(255, 255, 255, 0.05);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.btn-danger:hover:not(:disabled) {
+  background-color: var(--red);
+  color: white;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2);
+  transform: translateY(-1px);
+}
+
+/* Form and filter hover states */
+.filter-select:hover,
+.form-group input:hover,
+.form-group select:hover,
+.form-group textarea:hover {
+  border-color: var(--accent);
+}
+
+/* Modal close button hover animation */
+.modal-close {
+  transition: transform 0.2s ease, color 0.2s ease;
+}
+.modal-close:hover {
+  transform: rotate(90deg);
+  color: var(--red);
+}

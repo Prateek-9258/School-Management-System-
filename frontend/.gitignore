@@ -1,0 +1,127 @@
+# ============================================
+# ROOT LEVEL
+# ============================================
+
+# Backend dependencies
+/backend/node_modules
+/backend/.env
+
+# Frontend dependencies  
+/frontend/node_modules
+/frontend/.env
+
+# Root dependencies (agar ho)
+/node_modules
+
+# ============================================
+# FRONTEND (React/Vite)
+# ============================================
+
+# dependencies
+frontend/.pnp
+frontend/.pnp.js
+
+# testing
+frontend/coverage
+
+# production
+frontend/build
+frontend/dist
+
+# misc
+frontend/.DS_Store
+frontend/.env.local
+frontend/.env.development.local
+frontend/.env.test.local
+frontend/.env.production.local
+
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+
+# ============================================
+# BACKEND (Node/Express)
+# ============================================
+
+# Logs
+backend/logs
+backend/*.log
+backend/npm-debug.log*
+backend/yarn-debug.log*
+backend/yarn-error.log*
+
+# Runtime data
+backend/pids
+backend/*.pid
+backend/*.seed
+backend/*.pid.lock
+
+# Coverage directory
+backend/coverage
+
+# nyc test coverage
+backend/.nyc_output
+
+# Grunt intermediate storage
+backend/.grunt
+
+# Bower dependency directory
+backend/bower_components
+
+# node-waf configuration
+backend/.lock-wscript
+
+# Compiled binary addons
+backend/build/Release
+
+# Dependency directories
+backend/jspm_packages/
+
+# Optional npm cache directory
+backend/.npm
+
+# Optional REPL history
+backend/.node_repl_history
+
+# Output of 'npm pack'
+backend/*.tgz
+
+# Yarn Integrity file
+backend/.yarn-integrity
+
+# dotenv environment variables file
+backend/.env
+
+# ============================================
+# GLOBAL
+# ============================================
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Temporary files
+*.tmp
+*.temp
+
+# Debug files
+.debug
+
+# Local environment files
+.env
+.env.local
+.env.development
+.env.test
+.env.production
