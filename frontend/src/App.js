@@ -11,7 +11,6 @@ import Fees       from './pages/Fees';
 import Layout     from './components/Layout';
 import Announcements from './pages/Announcements';
 
-
 // ✅ NEW: Import PWA components
 import InstallPrompt from './components/InstallPrompt';
 
@@ -29,7 +28,12 @@ function GuestRoute({ children }) {
 
 export default function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter
+      future={{
+        v7_startTransition: true,
+        v7_relativeSplatPath: true,
+      }}
+    >
       <AuthProvider>
         <Routes>
           <Route path="/login"  element={<GuestRoute><Login /></GuestRoute>} />

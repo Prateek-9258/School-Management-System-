@@ -125,7 +125,7 @@ export default function Attendance() {
 
   useEffect(() => { fetchAll(); }, [selectedMonth, selectedYear, filterClass]);
 
-  // ✅ NEW: Productivity Feature - Mark all students present for TODAY
+  // Mark all students present for TODAY
   const markAllPresentToday = () => {
     const todayStr = new Date().toISOString().split('T')[0];
     if (!dates.includes(todayStr)) {
@@ -146,7 +146,6 @@ export default function Attendance() {
   const setStatus = (studentId, date, status) => {
     setAttGrid(prev => {
       const currentStatus = prev[studentId]?.[date];
-      // Agar wahi status dobara click kiya toh use clear ('') kar do
       const newStatus = currentStatus === status ? '' : status;
       return {
         ...prev,
@@ -158,7 +157,7 @@ export default function Attendance() {
     });
   };
 
-  // ✅ FIXED: Chunked save to prevent 413 error
+  // ✅ FIXED: Sequential chunked save to prevent race conditions
   const handleSave = async () => {
     setSaving(true); 
     setSaved(false);
@@ -167,26 +166,34 @@ export default function Attendance() {
       const allRecords = [];
       dates.forEach(date => {
         students.forEach(s => {
-          allRecords.push({
-            studentId: s._id,
-            date,
-            status: attGrid[s._id]?.[date] || '',
-            class: s.class,
-            section: 'A'
-          });
+          const status = attGrid[s._id]?.[date] || '';
+          // ✅ FIX: Only save records with actual status (skip empty)
+          if (status) {
+            allRecords.push({
+              studentId: s._id,
+              date,
+              status: status,
+              class: s.class,
+              section: 'A'
+            });
+          }
         });
       });
 
-      // ✅ CHUNK DATA - Increase size to 1000 and run in parallel for speed
-      const chunks = chunkArray(allRecords, 1000);
+      // ✅ FIX: Smaller chunk size (500) for reliability
+      const chunks = chunkArray(allRecords, 500);
       
-      // Parallel save is much faster than sequential (waiting for each)
-      await Promise.all(chunks.map(chunk => 
-        markBulkAttendance({ records: chunk })
-      ));
+      // ✅ FIX: Sequential save instead of Promise.all to avoid race conditions
+      let totalSaved = 0;
+      for (let i = 0; i < chunks.length; i++) {
+        const chunk = chunks[i];
+        await markBulkAttendance({ records: chunk });
+        totalSaved += chunk.length;
+        console.log(`✅ Chunk ${i + 1}/${chunks.length} saved (${chunk.length} records)`);
+      }
 
       setSaved(true);
-      showToast(`Saved ${allRecords.length} attendance records!`);
+      showToast(`Saved ${totalSaved} attendance records!`);
       setTimeout(() => setSaved(false), 3000);
 
     } catch (err) {
@@ -246,7 +253,10 @@ export default function Attendance() {
             const { present, absent } = getSummary(s._id);
             return (
               <tr key={s._id} style={{ background: idx % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.02)' }}>
-                <td style={{ ...tdStyle(), minWidth: '110px', textAlign: 'left', padding: '6px 10px', fontWeight: '500', position: 'sticky', left: 0, background: idx % 2 === 0 ? 'var(--surface)' : 'var(--surface2)', zIndex: 1 }}><div>{s.name}</div><div style={{ fontSize:'11px', color:'var(--muted)' }}>Roll {s.rollNumber}</div></td>{dates.map(date => { const status = attGrid[s._id]?.[date] || ''; return ( <td key={date} style={tdStyle()}><div style={{ display:'flex', gap:'5px', justifyContent:'center', padding: '4px 0' }}><button onClick={() => setStatus(s._id, date, 'P')} style={{ width: '26px', height: '26px', borderRadius: '6px', border: status === 'P' ? '2px solid var(--green)' : '1px solid var(--border)', cursor: 'pointer', fontWeight: '700', fontSize: '11px', background: status === 'P' ? 'rgba(34,197,94,0.2)' : 'transparent', color: status === 'P' ? 'var(--green)' : 'var(--muted)', transition: 'all 0.1s', lineHeight: 1 }}>P</button><button onClick={() => setStatus(s._id, date, 'A')} style={{ width: '26px', height: '26px', borderRadius: '6px', border: status === 'A' ? '2px solid var(--red)' : '1px solid var(--border)', cursor: 'pointer', fontWeight: '700', fontSize: '11px', background: status === 'A' ? 'rgba(239,68,68,0.2)' : 'transparent', color: status === 'A' ? 'var(--red)' : 'var(--muted)', transition: 'all 0.1s', lineHeight: 1 }}>A</button></div></td> ); })}<td style={{ ...tdStyle(), fontWeight:'600' }}><span style={{ color:'var(--green)', fontSize:'12px' }}>{present}P</span>{' / '}<span style={{ color:'var(--red)', fontSize:'12px' }}>{absent}A</span></td>
+                <td style={{ ...tdStyle(), minWidth: '110px', textAlign: 'left', padding: '6px 10px', fontWeight: '500', position: 'sticky', left: 0, background: idx % 2 === 0 ? 'var(--surface)' : 'var(--surface2)', zIndex: 1 }}><div>{s.name}</div><div style={{ fontSize:'11px', color:'var(--muted)' }}>Roll {s.rollNumber}</div>
+                </td>{dates.map(date => { const status = attGrid[s._id]?.[date] || ''; return ( <td key={date} style={tdStyle()}><div style={{ display:'flex', gap:'5px', justifyContent:'center', padding: '4px 0' }}><button onClick={() => setStatus(s._id, date, 'P')} style={{ width: '26px', height: '26px', borderRadius: '6px', border: status === 'P' ? '2px solid var(--green)' : '1px solid var(--border)', cursor: 'pointer', fontWeight: '700', fontSize: '11px', background: status === 'P' ? 'rgba(34,197,94,0.2)' : 'transparent', color: status === 'P' ? 'var(--green)' : 'var(--muted)', transition: 'all 0.1s', lineHeight: 1 }}>P</button><button onClick={() => setStatus(s._id, date, 'A')} style={{ width: '26px', height: '26px', borderRadius: '6px', border: status === 'A' ? '2px solid var(--red)' : 
+                  '1px solid var(--border)', cursor: 'pointer', fontWeight: '700', fontSize: '11px', background: status === 'A' ? 'rgba(239,68,68,0.2)' : 'transparent', color: status === 'A' ? 'var(--red)' : 'var(--muted)', transition: 'all 0.1s', lineHeight: 1 }}>A</button></div></td> ); })}<td style={{ ...tdStyle(), fontWeight:'600' }}><span style={{ color:'var(--green)', fontSize:'12px' }}>{present}P</span>{' / '}
+                  <span style={{ color:'var(--red)', fontSize:'12px' }}>{absent}A</span></td>
               </tr>
             );
           })}
@@ -290,6 +300,29 @@ export default function Attendance() {
             onMouseLeave={e => e.currentTarget.style.background = 'rgba(79, 142, 247, 0.05)'}
           >
             <span style={{ fontSize: '14px' }}>📄</span> Export PDF
+          </button>
+          {/* ✅ FIX: Mark All Present button */}
+          <button 
+            onClick={markAllPresentToday}
+            disabled={saving}
+            style={{
+              padding: '10px 16px',
+              borderRadius: '10px',
+              border: '1px solid rgba(34, 197, 94, 0.25)',
+              background: 'rgba(34, 197, 94, 0.05)',
+              color: 'var(--green)',
+              cursor: 'pointer',
+              fontSize: '13px',
+              fontWeight: '600',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              transition: 'all 0.2s ease'
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = 'rgba(34, 197, 94, 0.12)'}
+            onMouseLeave={e => e.currentTarget.style.background = 'rgba(34, 197, 94, 0.05)'}
+          >
+            <span style={{ fontSize: '14px' }}>✅</span> Mark All Present
           </button>
           <button className="btn btn-primary" onClick={handleSave} disabled={saving || students.length === 0}>
             {saving ? 'Saving...' : saved ? '✅ Saved!' : 'Save All'}

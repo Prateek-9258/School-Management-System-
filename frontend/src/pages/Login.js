@@ -23,8 +23,8 @@ export default function Login() {
     if (mobile.length < 10) return alert('Please enter a valid 10-digit number');
     localStorage.setItem('last_forgot_mobile', mobile); // Number ko save kiya
     setLoading(true);
-    try {
-      const res = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5005/api'}/auth/forgot-password`, {
+    try { 
+      const res = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:10000'}/api/auth/forgot-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mobile })
@@ -54,7 +54,7 @@ export default function Login() {
   const handleResetPassword = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5005/api'}/auth/reset-password`, {
+      const res = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:10000'}/api/auth/reset-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mobile, newPassword })

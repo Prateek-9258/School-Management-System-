@@ -1,19 +1,73 @@
-import React from 'react';
-import ReactDOM from 'react-dom/client';
-import App from './App';
+const CACHE_NAME = 'school-app-v1';
 
-// Service Worker Registration
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/service-worker.js')
-      .then((registration) => {
-        console.log('SW registered:', registration);
-      })
-      .catch((error) => {
-        console.log('SW registration failed:', error);
-      });
-  });
-}
+// Install event
+self.addEventListener('install', (event) => {
+  console.log('Service Worker installing...');
+  self.skipWaiting();
+});
 
-const root = ReactDOM.createRoot(document.getElementById('root'));
-root.render(<App />);
+// Activate event
+self.addEventListener('activate', (event) => {
+  console.log('Service Worker activated');
+  event.waitUntil(self.clients.claim());
+});
+
+// Push notification receive karna
+self.addEventListener('push', (event) => {
+  console.log('📨 Push received:', event);
+
+  const data = event.data.json();
+
+  const options = {
+    body: data.body || 'New notification',
+    icon: data.icon || '/logo192.png',
+    badge: data.badge || '/badge.png',
+    tag: data.tag || 'school-notification',
+    requireInteraction: data.requireInteraction || true,
+    data: {
+      url: data.url || '/'
+    },
+    actions: [
+      {
+        action: 'open',
+        title: 'Open'
+      },
+      {
+        action: 'close',
+        title: 'Close'
+      }
+    ]
+  };
+
+  event.waitUntil(
+    self.registration.showNotification(data.title || 'School Management', options)
+  );
+});
+
+// Notification click handle karna
+self.addEventListener('notificationclick', (event) => {
+  console.log('🔔 Notification clicked:', event);
+
+  event.notification.close();
+
+  const url = event.notification.data?.url || '/';
+
+  if (event.action === 'close') {
+    return;
+  }
+
+  event.waitUntil(
+    clients.matchAll({ type: 'window' }).then((clientList) => {
+      // Agar already open window hai, usko focus karo
+      for (const client of clientList) {
+        if (client.url === url && 'focus' in client) {
+          return client.focus();
+        }
+      }
+      // Nahi toh naya window open karo
+      if (clients.openWindow) {
+        return clients.openWindow(url);
+      }
+    })
+  );
+});

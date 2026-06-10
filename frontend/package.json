@@ -2,7 +2,7 @@
   "name": "school-management-frontend",
   "version": "1.0.0",
   "private": true,
-  "proxy": "http://localhost:5000",
+  "proxy": "http://localhost:10000",
   "dependencies": {
     "axios": "^1.17.0",
     "react": "^18.2.0",

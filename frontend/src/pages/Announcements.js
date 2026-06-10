@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import './announcements.css';
 import { useAuth } from '../context/AuthContext';
 
-const API_BASE_URL = 'http://localhost:5000/api';
+// ✅ FIX: API URL mein /api/ prefix ensure karo
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:10000/api';
 
 const priorityColors = {
   low: 'text-slate-400 bg-slate-400/10 border-slate-400/20',
@@ -44,6 +46,7 @@ export default function Announcements() {
   const [editData, setEditData] = useState(null);
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
+  const [pushStatus, setPushStatus] = useState(null); // State to hold push notification status
   const [formData, setFormData] = useState({ 
     title: '', 
     content: '', 
@@ -54,20 +57,125 @@ export default function Announcements() {
     expiresAt: '' 
   });
 
+  // ✅ Helper: Base64 to Uint8Array (same as before)
+  const urlBase64ToUint8Array = (base64String) => {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const rawData = window.atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; ++i) outputArray[i] = rawData.charCodeAt(i);
+    return outputArray;
+  };
+
+  // ✅ NEW: Fetch VAPID Public Key from backend
+  const getVAPIDPublicKey = async () => {
+    const res = await fetch(`${API_BASE_URL}/push/vapid-public-key`);
+    if (!res.ok) {
+      throw new Error(`Failed to fetch VAPID public key: ${res.statusText}`);
+    }
+    const data = await res.json();
+    return data.publicKey;
+  };
+
+
+  // ✅ FIX: Subscribe with real VAPID key and correct endpoint
+  const subscribeUser = async () => {
+    try {
+      if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+        console.log('Push notifications not supported');
+        return;
+      }
+
+      const registration = await navigator.serviceWorker.ready;
+      
+      // Check if already subscribed
+      const existingSubscription = await registration.pushManager.getSubscription();
+      if (existingSubscription) {
+        console.log('✅ Already subscribed');
+        return;
+      }
+
+      // ✅ Fetch VAPID Public Key
+      const vapidPublicKey = await getVAPIDPublicKey();
+
+      const subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(vapidPublicKey)
+      });
+
+      console.log('✅ Push Subscription:', subscription);
+
+      // ✅ FIX: Correct API endpoint with /api/ prefix
+      const res = await fetch(`${API_BASE_URL}/api/push/subscribe`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({ subscription })
+      });
+
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+      }
+
+      const data = await res.json();
+      console.log('✅ Subscription saved:', data);
+
+    } catch (err) {
+      console.error('❌ SW Subscribe Error:', err);
+    }
+  };
+
+  // ✅ FIX: Proper error handling + JSON validation
   const loadAnnouncements = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/announcements`);
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API_BASE_URL}/api/announcements`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      // ✅ FIX: Check if response is OK before parsing JSON
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+      }
+
+      // ✅ FIX: Check content-type
+      const contentType = res.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        throw new Error('Response is not JSON - check API URL');
+      }
+
       const data = await res.json();
-      setAnnouncements(data.data || []);
+      setAnnouncements(data.data || data || []); // Handle both {data: []} and direct array
     } catch (e) {
-      console.error(e);
+      console.error('❌ Load Announcements Error:', e);
+      setAnnouncements([]); // Empty array on error
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { loadAnnouncements(); }, []);
+  useEffect(() => { 
+    loadAnnouncements(); 
+    
+    // ✅ FIX: Better notification permission handling
+    if ("Notification" in window) {
+      Notification.requestPermission().then(async (permission) => {
+        if (permission === "granted") {
+          console.log("✅ Notification permission granted.");
+          try { 
+            await subscribeUser(); // Call subscribeUser after permission is granted
+          } catch (e) { 
+            console.error("❌ Subscribe failed:", e); 
+          }
+        } else {
+          console.log("⚠️ Notification permission:", permission);
+        }
+      });
+    }
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -77,16 +185,24 @@ export default function Announcements() {
       const method = editData ? 'PUT' : 'POST';
       const url = editData ? `${API_BASE_URL}/announcements/${editData._id}` : `${API_BASE_URL}/announcements`;
       
-      await fetch(url, {
+      const token = localStorage.getItem('token');
+      const response = await fetch(url, {
         method,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify(payload)
       });
       
+      if (!response.ok) throw new Error(`HTTP ${response.status}: Failed to publish`);
+      const result = await response.json();
+      setPushStatus(result.pushNotificationStatus); // Save push status
+
       setShowForm(false);
       loadAnnouncements();
     } catch (e) {
-      console.error(e);
+      console.error('❌ Submit Error:', e);
     } finally {
       setLoading(false);
     }
@@ -95,18 +211,47 @@ export default function Announcements() {
   const handleDelete = async (id) => {
     if (!window.confirm('Are you sure you want to delete this?')) return;
     try {
-      await fetch(`${API_BASE_URL}/announcements/${id}`, { method: 'DELETE' });
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API_BASE_URL}/announcements/${id}`, { 
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      if (!res.ok) throw new Error(`HTTP ${res.status}: Delete failed`);
+      
       loadAnnouncements();
     } catch (e) {
-      console.error(e);
+      console.error('❌ Delete Error:', e);
+    }
+  };
+
+  const handleDeleteAll = async () => {
+    if (announcements.length === 0) return alert('No announcements to delete.');
+    if (!window.confirm(`⚠️ Warning: All ${announcements.length} announcements will be deleted forever. Proceed?`)) return;
+    if (!window.confirm('Final confirmation: Are you absolutely sure?')) return;
+
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API_BASE_URL}/announcements/all`, { 
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      if (!res.ok) throw new Error(`HTTP ${res.status}: Delete all failed`);
+      loadAnnouncements();
+    } catch (e) {
+      console.error('❌ Delete All Error:', e);
+    } finally {
+      setLoading(false);
     }
   };
 
   const filtered = announcements.filter(a => {
     const matchesFilter = filter === 'all' || a.priority === filter;
     const matchesSearch = !search || 
-      a.title.toLowerCase().includes(search.toLowerCase()) || 
-      a.content.toLowerCase().includes(search.toLowerCase());
+      a.title?.toLowerCase().includes(search.toLowerCase()) || 
+      a.content?.toLowerCase().includes(search.toLowerCase());
     return matchesFilter && matchesSearch;
   });
 
@@ -132,13 +277,21 @@ export default function Announcements() {
           <p className="text-slate-400 mt-1 text-base">Broadcast updates to the school community</p>
         </div>
         {isAdmin && (
-          <button 
-            onClick={() => { setEditData(null); setFormData({ title: '', content: '', priority: 'normal', targetAudience: 'all', targetClass: '', pinned: false, expiresAt: '' }); setShowForm(true); }}
-            className="flex items-center justify-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold transition-all shadow-lg shadow-indigo-500/30 active:scale-95"
-          >
-            <div dangerouslySetInnerHTML={{ __html: getIcon('plus') }} />
-            Create New
-          </button>
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={handleDeleteAll} className="btn-delete-all text-sm sm:text-base whitespace-nowrap" title="Delete All Announcements"
+            >
+              <div dangerouslySetInnerHTML={{ __html: getIcon('delete') }} />
+              <span>Delete All</span>
+            </button>
+            <button 
+              onClick={() => { setEditData(null); setFormData({ title: '', content: '', priority: 'normal', targetAudience: 'all', targetClass: '', pinned: false, expiresAt: '' }); setShowForm(true); }}
+              className="flex items-center justify-center gap-2 px-4 sm:px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold transition-all shadow-lg shadow-indigo-500/30 active:scale-95 text-sm sm:text-base whitespace-nowrap"
+            >
+              <div dangerouslySetInnerHTML={{ __html: getIcon('plus') }} />
+              Create New
+            </button>
+          </div>
         )}
       </div>
 
@@ -190,7 +343,7 @@ export default function Announcements() {
                 </div>
               </div>
               {isAdmin && (
-                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="flex gap-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                   <button onClick={() => { setEditData(a); setFormData({ ...a }); setShowForm(true); }} className="p-2 hover:bg-slate-700 rounded-lg text-slate-400" title="Edit"><div dangerouslySetInnerHTML={{ __html: getIcon('edit') }} /></button>
                   <button onClick={() => handleDelete(a._id)} className="p-2 hover:bg-slate-700 rounded-lg text-slate-400 hover:text-rose-400" title="Delete"><div dangerouslySetInnerHTML={{ __html: getIcon('delete') }} /></button>
                 </div>
@@ -259,6 +412,20 @@ export default function Announcements() {
               </div>
             </form>
           </div>
+        </div>
+      )}
+
+      {/* Push Notification Status Display */}
+      {pushStatus && (
+        <div className={`fixed bottom-4 right-4 p-4 rounded-xl shadow-lg z-50 text-sm font-medium animate-fade-in ${pushStatus.failed > 0 ? 'bg-red-500' : 'bg-green-500'}`}>
+          {pushStatus.failed > 0 ? (
+            <p>❌ Announcement published, but {pushStatus.failed} push notifications failed to send.</p>
+          ) : (
+            <p>✅ Announcement published! {pushStatus.sent} push notifications sent successfully.</p>
+          )}
+          <button onClick={() => setPushStatus(null)} className="absolute top-1 right-1 text-white opacity-70 hover:opacity-100">
+            ✕
+          </button>
         </div>
       )}
     </div>

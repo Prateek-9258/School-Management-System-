@@ -1,0 +1,117 @@
+/* Announcements Custom Styles */
+
+.animate-fade-in {
+    animation: fadeIn 0.3s ease-out forwards;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Scrollbar Hide for filter tabs */
+.scrollbar-hide::-webkit-scrollbar {
+    display: none;
+}
+
+.scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+/* Announcement Card Hover Effect */
+.group:hover {
+    box-shadow: 0 10px 30px -10px rgba(79, 70, 229, 0.2);
+}
+
+/* Priority Badge Pulsing (for Urgent/High) */
+.priority-urgent {
+    animation: pulse-red 2s infinite;
+}
+
+@keyframes pulse-red {
+    0% { box-shadow: 0 0 0 0 rgba(244, 63, 94, 0.4); }
+    70% { box-shadow: 0 0 0 10px rgba(244, 63, 94, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(244, 63, 94, 0); }
+}
+
+/* Custom Focus Ring for Inputs */
+input:focus, textarea:focus, select:focus {
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+}
+
+/* Notification Toast Styling */
+.push-status-toast {
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    min-width: 300px;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 640px) {
+    .announcement-form-modal {
+        width: 100%;
+        height: 100%;
+        border-radius: 0;
+    }
+    .announcement-card {
+        padding: 1rem;
+    }
+}
+
+/* Delete All Button Styling */
+.btn-delete-all {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px 16px; /* Default for mobile, matches px-4 py-3 */
+    background-color: rgba(244, 63, 94, 0.1); /* bg-rose-600/10 */
+    color: #f43f5e; /* text-rose-500 */
+    border: 1px solid rgba(244, 63, 94, 0.2); /* border-rose-500/20 */
+    border-radius: 12px; /* rounded-xl */
+    font-weight: 700; /* font-bold */
+    transition: all 0.2s ease; /* transition-all */
+    cursor: pointer;
+    min-height: 44px;
+    text-shadow: 0 0 4px rgba(244, 63, 94, 0.2); /* Subtle glow for text */
+    font-size: 0.875rem; /* text-sm */
+}
+.btn-delete-all:hover {
+    background-color: #e11d48; /* hover:bg-rose-600 */
+    color: #fff; /* hover:text-white */
+    box-shadow: 0 6px 16px rgba(244, 63, 94, 0.3); /* More pronounced shadow */
+    border-color: #e11d48; /* Solid border on hover */
+    transform: translateY(-2px); /* Slight lift */
+    text-shadow: none; /* Remove text shadow on solid background */
+}
+.btn-delete-all:active {
+    transform: scale(0.95); /* active:scale-95 */
+    box-shadow: 0 2px 8px rgba(244, 63, 94, 0.2); /* Smaller shadow on active */
+}
+
+@media (max-width: 640px) {
+    .btn-delete-all {
+        padding: 10px;
+        width: 44px;
+        height: 44px;
+        flex-shrink: 0;
+        font-size: 0; /* Hide text on mobile, making it icon-only */
+        text-shadow: none;
+    }
+    .btn-delete-all svg { /* Ensure icon is visible and centered */
+        width: 24px;
+        height: 24px;
+    }
+    .btn-delete-all:hover {
+        transform: none; /* No lift on mobile icon-only */
+        box-shadow: 0 4px 12px rgba(244, 63, 94, 0.2); /* Keep hover shadow */
+    }
+}
+
+@media (min-width: 641px) { /* sm breakpoint and above */
+    .btn-delete-all {
+        padding: 12px 24px; /* Matches px-6 py-3 */
+        font-size: 1rem; /* text-base */
+    }
+}

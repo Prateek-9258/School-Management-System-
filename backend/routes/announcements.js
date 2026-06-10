@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const Announcement = require('../models/Announcement');
+const { sendPushNotification } = require('../utils/pushService'); // Import the utility
 
 // GET /api/announcements - Sab announcements lao
 router.get('/', async (req, res) => {
@@ -87,11 +88,27 @@ router.post('/', async (req, res) => {
     });
     
     await announcement.save();
+
+    // ✅ Send Push Notification for new announcement
+    const notificationPayload = {
+      title: `📢 New Announcement: ${announcement.title}`,
+      body: announcement.content.substring(0, 100) + (announcement.content.length > 100 ? '...' : ''),
+      icon: '/icons/icon-192x192.png', // PWA icon
+      url: '/announcements', // Frontend route to open on click
+      tag: `announcement-${announcement._id}`, // Unique tag to prevent duplicate notifications
+      requireInteraction: true, // User ko notification par click karna hoga
+      data: {
+        announcementId: announcement._id,
+        type: 'announcement'
+      }
+    };
+    const pushResult = await sendPushNotification(notificationPayload);
     
     res.status(201).json({
       success: true,
       message: 'Announcement created successfully',
-      data: announcement
+      data: announcement,
+      pushNotificationStatus: pushResult // Frontend ko feedback bhejo
     });
   } catch (error) {
     console.error('Create announcement error:', error);
@@ -128,17 +145,52 @@ router.put('/:id', async (req, res) => {
     if (isActive !== undefined) announcement.isActive = isActive;
     
     await announcement.save();
+
+    // ✅ Send Push Notification for updated announcement
+    const notificationPayload = {
+      title: `🔄 Announcement Updated: ${announcement.title}`,
+      body: announcement.content.substring(0, 100) + (announcement.content.length > 100 ? '...' : ''),
+      icon: '/icons/icon-192x192.png', // PWA icon
+      url: '/announcements', // Frontend route to open on click
+      tag: `announcement-${announcement._id}`, // Unique tag
+      requireInteraction: true,
+      data: {
+        announcementId: announcement._id,
+        type: 'announcement'
+      }
+    };
+    const pushResult = await sendPushNotification(notificationPayload);
     
     res.json({
       success: true,
       message: 'Announcement updated successfully',
-      data: announcement
+      data: announcement,
+      pushNotificationStatus: pushResult // Frontend ko feedback bhejo
     });
   } catch (error) {
     console.error('Update announcement error:', error);
     res.status(500).json({
       success: false,
       message: 'Server error while updating announcement',
+      error: error.message
+    });
+  }
+});
+
+// DELETE /api/announcements/all - Sab announcements delete karo
+router.delete('/all', async (req, res) => {
+  try {
+    await Announcement.deleteMany({});
+    
+    res.json({
+      success: true,
+      message: 'All announcements deleted successfully'
+    });
+  } catch (error) {
+    console.error('Delete all announcements error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while deleting all announcements',
       error: error.message
     });
   }

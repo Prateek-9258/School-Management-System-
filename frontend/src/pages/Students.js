@@ -9,7 +9,7 @@ const EMPTY = { name:'', rollNumber:'', class:'', section:'A', gender:'Male', do
 
 const deleteAllStudentsAPI = () => {
   const token = localStorage.getItem('token');
-  return fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5005/api'}/students/all`, {
+  return fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:10000'}/api/students/all`, {
     method: 'DELETE',
     headers: { 
       'Authorization': `Bearer ${token}`,
@@ -236,7 +236,7 @@ export default function Students() {
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch('http://localhost:5000/api/students/sync-all-logins', {
+      const res = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:10000'}/api/students/sync-all-logins`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` }
       });

@@ -23,15 +23,6 @@ const Dashboard = () => {
   const [myTodayStatus, setMyTodayStatus] = useState('Not Marked');
 
   useEffect(() => {
-    // ✅ NEW: Register Service Worker for PWA to start working
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/service-worker.js')
-          .then(reg => console.log('PWA Service Worker Active:', reg.scope))
-          .catch(err => console.error('PWA Registration failed:', err));
-      });
-    }
-
     loadDashboardData();
 
     // Close notification dropdown when clicking outside
