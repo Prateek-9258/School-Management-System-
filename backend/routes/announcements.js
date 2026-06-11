@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const Announcement = require('../models/Announcement');
-const { sendPushNotification } = require('../utils/pushService');
+const { sendPushNotification } = require('../pushService');
 
 // GET /api/announcements - Sab announcements lao
 router.get('/', async (req, res) => {

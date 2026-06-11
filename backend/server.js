@@ -129,6 +129,9 @@ const routesDir = path.join(__dirname, 'routes');
 if (fs.existsSync(routesDir)) {
   fs.readdirSync(routesDir).forEach(file => {
     if (file.endsWith('.js')) {
+      // ✅ Skip redundant or broken route files
+      if (file === 'notificationRoutes.js' || file === 'Announcements.js') return;
+
       const routeName = file.replace('.js', '');
       let routePath;
       
@@ -142,8 +145,19 @@ if (fs.existsSync(routesDir)) {
       else routePath = `/api/${routeName}`;
       
       try {
-        app.use(routePath, require(`./routes/${file}`));
-        console.log(`✅ Route loaded: ${routePath} → ${file}`);
+        const routeModule = require(`./routes/${file}`);
+        
+        // ✅ Fix: Handle both CommonJS and ES Module exports
+        const router = routeModule.default || routeModule;
+
+        // ✅ Fix: Ensure the export is a valid middleware function/router
+        if (typeof router === 'function') {
+          app.use(routePath, router);
+          console.log(`✅ Route loaded: ${routePath} → ${file}`);
+        } else {
+          // Log specific error for the file instead of crashing Express
+          throw new Error(`Module in "${file}" does not export a valid Express router function. Check "module.exports".`);
+        }
       } catch (err) {
         console.error(`❌ Route failed: ${routePath} → ${file} - ${err.message}`);
       }
@@ -152,10 +166,6 @@ if (fs.existsSync(routesDir)) {
 } else {
   console.error('❌ Routes directory not found:', routesDir);
 }
-
-// ✅ FALLBACK: Also mount /announcements without /api prefix (for old frontend)
-// REMOVE THIS once frontend is updated to use /api/announcements
-app.use('/announcements', require('./routes/announcements'));
 
 // ✅ Health check
 app.get('/health', (req, res) => {

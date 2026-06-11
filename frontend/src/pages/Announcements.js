@@ -3,8 +3,8 @@ import './announcements.css';
 import { useAuth } from '../context/AuthContext';
 
 // ✅ FIX: Auto-detect API URL - works on both localhost and production
-const BASE_URL = process.env.REACT_APP_API_URL || window.location.origin;
-const API_BASE_URL = BASE_URL.endsWith('/api') ? BASE_URL : `${BASE_URL.replace(/\/$/, '')}/api`;
+const BACKEND_DOMAIN = 'https://school-management-system-dszc.onrender.com';
+const API_BASE_URL = `${BACKEND_DOMAIN}/api`;
 
 const priorityColors = {
   low: 'text-slate-400 bg-slate-400/10 border-slate-400/20',
@@ -71,14 +71,10 @@ export default function Announcements() {
   // ✅ FIX: Fetch VAPID Public Key from correct endpoint
   const getVAPIDPublicKey = async () => {
     try {
-      const res = await fetch(`${API_BASE_URL}/push/vapid-public-key`);
-      if (!res.ok) {
-        // Fallback to announcements endpoint
-        const fallbackRes = await fetch(`${API_BASE_URL}/announcements/vapid-public-key`);
-        if (!fallbackRes.ok) throw new Error(`Failed to fetch VAPID public key: ${fallbackRes.status}`);
-        const data = await fallbackRes.json();
-        return data.publicKey;
-      }
+      // Try push endpoint first, then fallback
+      const res = await fetch(`${API_BASE_URL}/push/vapid-public-key`).catch(() => null);
+      if (!res || !res.ok) return (await (await fetch(`${API_BASE_URL}/announcements/vapid-public-key`)).json()).publicKey;
+      
       const data = await res.json();
       return data.publicKey;
     } catch (err) {
@@ -118,7 +114,10 @@ export default function Announcements() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
-        body: JSON.stringify({ subscription })
+        body: JSON.stringify({ 
+          subscription,
+          userId: user?.id || user?._id || 'admin' // ✅ User ID bhejna zaroori hai
+        })
       });
 
       if (!res.ok) {

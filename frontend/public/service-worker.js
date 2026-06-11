@@ -1,15 +1,39 @@
-const CACHE_NAME = 'school-app-v1';
+const CACHE_NAME = 'school-app-cache-v2';
+const STATIC_ASSETS = [
+  '/',
+  '/index.html',
+  '/manifest.json',
+  '/icons/icon-192x192.png',
+  '/icons/icon-512x512.png'
+];
 
 // Install event
 self.addEventListener('install', (event) => {
-  console.log('Service Worker installing...');
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS))
+  );
   self.skipWaiting();
 });
 
 // Activate event
 self.addEventListener('activate', (event) => {
-  console.log('Service Worker activated');
+  event.waitUntil(
+    caches.keys().then((names) => 
+      Promise.all(names.filter(n => n !== CACHE_NAME).map(n => caches.delete(n)))
+    )
+  );
   event.waitUntil(self.clients.claim());
+});
+
+// ✅ PWA Criteria: Fetch event listener is mandatory for installation
+self.addEventListener('fetch', (event) => {
+  if (event.request.method !== 'GET') return;
+  
+  event.respondWith(
+    caches.match(event.request).then((cached) => {
+      return cached || fetch(event.request);
+    })
+  );
 });
 
 // Push notification receive karna

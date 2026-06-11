@@ -5,17 +5,45 @@ const InstallPrompt = () => {
   const [show, setShow] = useState(false);
 
   useEffect(() => {
-    if (window.matchMedia('(display-mode: standalone)').matches) return;
-    const handler = (e) => { e.preventDefault(); setDeferredPrompt(e); setShow(true); };
+    // Agar app pehle se installed hai toh prompt mat dikhao
+    if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true) {
+      return;
+    }
+
+    const handler = (e) => {
+      // Browser ka default prompt roko
+      e.preventDefault();
+      // Event ko save karo taaki button click par use kar sakein
+      setDeferredPrompt(e);
+      setShow(true);
+      console.log('✅ PWA Install event captured');
+    };
+
     window.addEventListener('beforeinstallprompt', handler);
+
+    // Jab app install ho jaye toh button hata do
+    window.addEventListener('appinstalled', () => {
+      setShow(false);
+      setDeferredPrompt(null);
+      console.log('🚀 PWA installed successfully');
+    });
+
     return () => window.removeEventListener('beforeinstallprompt', handler);
   }, []);
 
   const handleInstall = async () => {
     if (!deferredPrompt) return;
+    
+    // Native install dialog dikhao
     deferredPrompt.prompt();
+    
+    // User ke choice ka wait karo
     const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === 'accepted') setShow(false);
+    console.log(`User response to install: ${outcome}`);
+    
+    if (outcome === 'accepted') {
+      setShow(false);
+    }
     setDeferredPrompt(null);
   };
 
