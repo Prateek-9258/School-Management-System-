@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import './announcements.css';
 import { useAuth } from '../context/AuthContext';
 
-// ✅ FIX: API URL mein /api/ prefix ensure karo
-const BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:10000';
+// ✅ FIX: Auto-detect API URL - works on both localhost and production
+const BASE_URL = process.env.REACT_APP_API_URL || window.location.origin;
 const API_BASE_URL = BASE_URL.endsWith('/api') ? BASE_URL : `${BASE_URL.replace(/\/$/, '')}/api`;
 
 const priorityColors = {
@@ -47,7 +47,7 @@ export default function Announcements() {
   const [editData, setEditData] = useState(null);
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
-  const [pushStatus, setPushStatus] = useState(null); // State to hold push notification status
+  const [pushStatus, setPushStatus] = useState(null);
   const [formData, setFormData] = useState({ 
     title: '', 
     content: '', 
@@ -58,7 +58,7 @@ export default function Announcements() {
     expiresAt: '' 
   });
 
-  // ✅ Helper: Base64 to Uint8Array (same as before)
+  // ✅ Helper: Base64 to Uint8Array
   const urlBase64ToUint8Array = (base64String) => {
     const padding = '='.repeat((4 - base64String.length % 4) % 4);
     const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
@@ -68,18 +68,26 @@ export default function Announcements() {
     return outputArray;
   };
 
-  // ✅ NEW: Fetch VAPID Public Key from backend
+  // ✅ FIX: Fetch VAPID Public Key from correct endpoint
   const getVAPIDPublicKey = async () => {
-    const res = await fetch(`${API_BASE_URL}/push/vapid-public-key`);
-    if (!res.ok) {
-      throw new Error(`Failed to fetch VAPID public key: ${res.statusText}`);
+    try {
+      const res = await fetch(`${API_BASE_URL}/push/vapid-public-key`);
+      if (!res.ok) {
+        // Fallback to announcements endpoint
+        const fallbackRes = await fetch(`${API_BASE_URL}/announcements/vapid-public-key`);
+        if (!fallbackRes.ok) throw new Error(`Failed to fetch VAPID public key: ${fallbackRes.status}`);
+        const data = await fallbackRes.json();
+        return data.publicKey;
+      }
+      const data = await res.json();
+      return data.publicKey;
+    } catch (err) {
+      console.error('❌ VAPID key fetch failed:', err);
+      throw err;
     }
-    const data = await res.json();
-    return data.publicKey;
   };
 
-
-  // ✅ FIX: Subscribe with real VAPID key and correct endpoint
+  // ✅ FIX: Subscribe with real VAPID key
   const subscribeUser = async () => {
     try {
       if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
@@ -89,14 +97,12 @@ export default function Announcements() {
 
       const registration = await navigator.serviceWorker.ready;
       
-      // Check if already subscribed
       const existingSubscription = await registration.pushManager.getSubscription();
       if (existingSubscription) {
         console.log('✅ Already subscribed');
         return;
       }
 
-      // ✅ Fetch VAPID Public Key
       const vapidPublicKey = await getVAPIDPublicKey();
 
       const subscription = await registration.pushManager.subscribe({
@@ -106,7 +112,6 @@ export default function Announcements() {
 
       console.log('✅ Push Subscription:', subscription);
 
-      // ✅ FIX: Removed double /api/
       const res = await fetch(`${API_BASE_URL}/push/subscribe`, {
         method: 'POST',
         headers: { 
@@ -128,7 +133,7 @@ export default function Announcements() {
     }
   };
 
-  // ✅ FIX: Proper error handling + JSON validation
+  // ✅ FIX: Load announcements with proper error handling
   const loadAnnouncements = async () => {
     setLoading(true);
     try {
@@ -137,22 +142,20 @@ export default function Announcements() {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 
-      // ✅ FIX: Check if response is OK before parsing JSON
       if (!res.ok) {
         throw new Error(`HTTP ${res.status}: ${res.statusText}`);
       }
 
-      // ✅ FIX: Check content-type
       const contentType = res.headers.get('content-type');
       if (!contentType || !contentType.includes('application/json')) {
         throw new Error('Response is not JSON - check API URL');
       }
 
       const data = await res.json();
-      setAnnouncements(data.data || data || []); // Handle both {data: []} and direct array
+      setAnnouncements(data.data || data || []);
     } catch (e) {
       console.error('❌ Load Announcements Error:', e);
-      setAnnouncements([]); // Empty array on error
+      setAnnouncements([]);
     } finally {
       setLoading(false);
     }
@@ -161,13 +164,12 @@ export default function Announcements() {
   useEffect(() => { 
     loadAnnouncements(); 
     
-    // ✅ FIX: Better notification permission handling
     if ("Notification" in window) {
       Notification.requestPermission().then(async (permission) => {
         if (permission === "granted") {
           console.log("✅ Notification permission granted.");
           try { 
-            await subscribeUser(); // Call subscribeUser after permission is granted
+            await subscribeUser();
           } catch (e) { 
             console.error("❌ Subscribe failed:", e); 
           }
@@ -198,7 +200,7 @@ export default function Announcements() {
       
       if (!response.ok) throw new Error(`HTTP ${response.status}: Failed to publish`);
       const result = await response.json();
-      setPushStatus(result.pushNotificationStatus); // Save push status
+      setPushStatus(result.pushNotificationStatus);
 
       setShowForm(false);
       loadAnnouncements();
@@ -416,10 +418,9 @@ export default function Announcements() {
         </div>
       )}
 
-      {/* Push Notification Status Display */}
       {pushStatus && (
-        <div className={`fixed bottom-4 right-4 p-4 rounded-xl shadow-lg z-50 text-sm font-medium animate-fade-in ${pushStatus.failed > 0 ? 'bg-red-500' : 'bg-green-500'}`}>
-          {pushStatus.failed > 0 ? (
+        <div className={`fixed bottom-4 right-4 p-4 rounded-xl shadow-lg z-50 text-sm font-medium animate-fade-in ${pushStatus && pushStatus.failed > 0 ? 'bg-red-500' : 'bg-green-500'}`}>
+          {pushStatus && pushStatus.failed > 0 ? (
             <p>❌ Announcement published, but {pushStatus.failed} push notifications failed to send.</p>
           ) : (
             <p>✅ Announcement published! {pushStatus.sent} push notifications sent successfully.</p>

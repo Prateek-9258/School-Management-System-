@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const Announcement = require('../models/Announcement');
-const { sendPushNotification } = require('../utils/pushService'); // Import the utility
+const { sendPushNotification } = require('../utils/pushService');
 
 // GET /api/announcements - Sab announcements lao
 router.get('/', async (req, res) => {
@@ -37,6 +37,11 @@ router.get('/', async (req, res) => {
       error: error.message
     });
   }
+});
+
+// GET /api/announcements/vapid-public-key - VAPID key for frontend
+router.get('/vapid-public-key', (req, res) => {
+  res.json({ publicKey: process.env.VAPID_PUBLIC_KEY });
 });
 
 // GET /api/announcements/:id - Single announcement
@@ -89,26 +94,32 @@ router.post('/', async (req, res) => {
     
     await announcement.save();
 
-    // ✅ Send Push Notification for new announcement
-    const notificationPayload = {
-      title: `📢 New Announcement: ${announcement.title}`,
-      body: announcement.content.substring(0, 100) + (announcement.content.length > 100 ? '...' : ''),
-      icon: '/icons/icon-192x192.png', // PWA icon
-      url: '/announcements', // Frontend route to open on click
-      tag: `announcement-${announcement._id}`, // Unique tag to prevent duplicate notifications
-      requireInteraction: true, // User ko notification par click karna hoga
-      data: {
-        announcementId: announcement._id,
-        type: 'announcement'
-      }
-    };
-    const pushResult = await sendPushNotification(notificationPayload);
+    // ✅ Send Push Notification (wrapped in try-catch so save doesn't fail)
+    let pushResult = null;
+    try {
+      const notificationPayload = {
+        title: `📢 New Announcement: ${announcement.title}`,
+        body: announcement.content.substring(0, 100) + (announcement.content.length > 100 ? '...' : ''),
+        icon: '/icons/icon-192x192.png',
+        url: '/announcements',
+        tag: `announcement-${announcement._id}`,
+        requireInteraction: true,
+        data: {
+          announcementId: announcement._id,
+          type: 'announcement'
+        }
+      };
+      pushResult = await sendPushNotification(notificationPayload);
+    } catch (pushErr) {
+      console.error('⚠️ Push notification failed:', pushErr.message);
+      pushResult = { error: pushErr.message, sent: 0, failed: 0 };
+    }
     
     res.status(201).json({
       success: true,
       message: 'Announcement created successfully',
       data: announcement,
-      pushNotificationStatus: pushResult // Frontend ko feedback bhejo
+      pushNotificationStatus: pushResult
     });
   } catch (error) {
     console.error('Create announcement error:', error);
@@ -146,26 +157,32 @@ router.put('/:id', async (req, res) => {
     
     await announcement.save();
 
-    // ✅ Send Push Notification for updated announcement
-    const notificationPayload = {
-      title: `🔄 Announcement Updated: ${announcement.title}`,
-      body: announcement.content.substring(0, 100) + (announcement.content.length > 100 ? '...' : ''),
-      icon: '/icons/icon-192x192.png', // PWA icon
-      url: '/announcements', // Frontend route to open on click
-      tag: `announcement-${announcement._id}`, // Unique tag
-      requireInteraction: true,
-      data: {
-        announcementId: announcement._id,
-        type: 'announcement'
-      }
-    };
-    const pushResult = await sendPushNotification(notificationPayload);
+    // ✅ Send Push Notification (wrapped in try-catch)
+    let pushResult = null;
+    try {
+      const notificationPayload = {
+        title: `🔄 Announcement Updated: ${announcement.title}`,
+        body: announcement.content.substring(0, 100) + (announcement.content.length > 100 ? '...' : ''),
+        icon: '/icons/icon-192x192.png',
+        url: '/announcements',
+        tag: `announcement-${announcement._id}`,
+        requireInteraction: true,
+        data: {
+          announcementId: announcement._id,
+          type: 'announcement'
+        }
+      };
+      pushResult = await sendPushNotification(notificationPayload);
+    } catch (pushErr) {
+      console.error('⚠️ Push notification failed:', pushErr.message);
+      pushResult = { error: pushErr.message, sent: 0, failed: 0 };
+    }
     
     res.json({
       success: true,
       message: 'Announcement updated successfully',
       data: announcement,
-      pushNotificationStatus: pushResult // Frontend ko feedback bhejo
+      pushNotificationStatus: pushResult
     });
   } catch (error) {
     console.error('Update announcement error:', error);

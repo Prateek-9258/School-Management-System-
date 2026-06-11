@@ -4,7 +4,7 @@ const mongoose = require('mongoose');
 const path = require('path');
 const fs = require('fs');
 const webpush = require('web-push');
-const PushSubscription = require('./models/PushSubscription'); // ✅ Import the correct model
+const PushSubscription = require('./models/PushSubscription');
 require('dotenv').config();
 
 const app = express();
@@ -13,7 +13,7 @@ const app = express();
 app.use(cors({
   origin: '*',
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
@@ -46,7 +46,6 @@ app.post('/api/push/subscribe', async (req, res) => {
       return res.status(400).json({ error: 'Invalid subscription' });
     }
 
-    // Upsert - update if exists, create if new
     await PushSubscription.findOneAndUpdate(
       { endpoint: subscription.endpoint },
       { 
@@ -81,11 +80,9 @@ app.post('/api/push/send', async (req, res) => {
 
     let subscriptions;
     
-    // Agar specific userId diya hai, sirf usko bhejo
     if (userId) {
       subscriptions = await PushSubscription.find({ userId });
     } else {
-      // Sabko bhejo
       subscriptions = await PushSubscription.find();
     }
 
@@ -93,7 +90,6 @@ app.post('/api/push/send', async (req, res) => {
       subscriptions.map(sub => 
         webpush.sendNotification(sub, payload)
           .catch(async err => {
-            // Invalid subscription - delete it
             if (err.statusCode === 410 || err.statusCode === 404) {
               await PushSubscription.deleteOne({ endpoint: sub.endpoint });
               console.log('🗑️ Deleted invalid subscription');
@@ -118,36 +114,63 @@ app.post('/api/push/send', async (req, res) => {
   }
 });
 
-// ✅ Get Public Key API (Frontend ke liye)
+// ✅ Get VAPID Public Key - Multiple paths for compatibility
 app.get('/api/push/vapid-public-key', (req, res) => {
+  res.json({ publicKey: process.env.VAPID_PUBLIC_KEY });
+});
+
+app.get('/api/announcements/vapid-public-key', (req, res) => {
   res.json({ publicKey: process.env.VAPID_PUBLIC_KEY });
 });
 
 // ✅ Dynamic Route Loading
 const routesDir = path.join(__dirname, 'routes');
 
-fs.readdirSync(routesDir).forEach(file => {
-  if (file.endsWith('.js')) {
-    const routeName = file.replace('.js', '');
-
-    let routePath;
-    
-    if (routeName === 'auth') routePath = '/api/auth';
-    else if (routeName === 'students') routePath = '/api/students';
-    else if (routeName === 'attendance') routePath = '/api/attendance';
-    else if (routeName === 'fees') routePath = '/api/fees';
-    else if (routeName === 'announcements') routePath = '/api/announcements';
-    else if (routeName === 'export') routePath = '/api/export';
-    else if (routeName === 'importRoutes') routePath = '/api/import';
-    else routePath = `/api/${routeName}`;
-    
-    try {
-      app.use(routePath, require(`./routes/${file}`));
-      console.log(`✅ Route loaded: ${routePath} → ${file}`);
-    } catch (err) {
-      console.error(`❌ Route failed: ${routePath} → ${file} - ${err.message}`);
+if (fs.existsSync(routesDir)) {
+  fs.readdirSync(routesDir).forEach(file => {
+    if (file.endsWith('.js')) {
+      const routeName = file.replace('.js', '');
+      let routePath;
+      
+      if (routeName === 'auth') routePath = '/api/auth';
+      else if (routeName === 'students') routePath = '/api/students';
+      else if (routeName === 'attendance') routePath = '/api/attendance';
+      else if (routeName === 'fees') routePath = '/api/fees';
+      else if (routeName === 'announcements') routePath = '/api/announcements';
+      else if (routeName === 'export') routePath = '/api/export';
+      else if (routeName === 'importRoutes') routePath = '/api/import';
+      else routePath = `/api/${routeName}`;
+      
+      try {
+        app.use(routePath, require(`./routes/${file}`));
+        console.log(`✅ Route loaded: ${routePath} → ${file}`);
+      } catch (err) {
+        console.error(`❌ Route failed: ${routePath} → ${file} - ${err.message}`);
+      }
     }
-  }
+  });
+} else {
+  console.error('❌ Routes directory not found:', routesDir);
+}
+
+// ✅ FALLBACK: Also mount /announcements without /api prefix (for old frontend)
+// REMOVE THIS once frontend is updated to use /api/announcements
+app.use('/announcements', require('./routes/announcements'));
+
+// ✅ Health check
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// ✅ Global Error Handler
+app.use((err, req, res, next) => {
+  console.error('Global error:', err);
+  res.status(500).json({ success: false, message: 'Internal server error', error: err.message });
+});
+
+// ✅ 404 Handler
+app.use((req, res) => {
+  res.status(404).json({ success: false, message: `Route not found: ${req.method} ${req.path}` });
 });
 
 // ✅ Port
