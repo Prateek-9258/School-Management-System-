@@ -72,7 +72,7 @@ app.post('/api/push/send', async (req, res) => {
     const payload = JSON.stringify({
       title: title || 'School Management',
       body: body || 'New notification',
-      icon: icon || '/logo192.png',
+      icon: icon || '/icons/icon-192x192.png',
       url: url || '/',
       badge: '/badge.png',
       tag: 'school-notification',
@@ -129,13 +129,13 @@ const routesDir = path.join(__dirname, 'routes');
 fs.readdirSync(routesDir).forEach(file => {
   if (file.endsWith('.js')) {
     const routeName = file.replace('.js', '');
+
     let routePath;
     
     if (routeName === 'auth') routePath = '/api/auth';
     else if (routeName === 'students') routePath = '/api/students';
     else if (routeName === 'attendance') routePath = '/api/attendance';
     else if (routeName === 'fees') routePath = '/api/fees';
-    // else if (routeName === 'notifications') routePath = '/api/notifications'; // ✅ Removed redundant route
     else if (routeName === 'announcements') routePath = '/api/announcements';
     else if (routeName === 'export') routePath = '/api/export';
     else if (routeName === 'importRoutes') routePath = '/api/import';

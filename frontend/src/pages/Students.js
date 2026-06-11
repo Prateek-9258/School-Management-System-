@@ -7,9 +7,11 @@ import ImportStudents from './Import';
 
 const EMPTY = { name:'', rollNumber:'', class:'', section:'A', gender:'Male', dob:'', parentName:'', contact:'', email:'', address:'', penNo:'' };
 
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:10000/api';
+
 const deleteAllStudentsAPI = () => {
   const token = localStorage.getItem('token');
-  return fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:10000'}/api/students/all`, {
+  return fetch(`${API_BASE_URL}/students/all`, {
     method: 'DELETE',
     headers: { 
       'Authorization': `Bearer ${token}`,
@@ -236,7 +238,7 @@ export default function Students() {
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:10000'}/api/students/sync-all-logins`, {
+      const res = await fetch(`${API_BASE_URL}/students/sync-all-logins`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` }
       });

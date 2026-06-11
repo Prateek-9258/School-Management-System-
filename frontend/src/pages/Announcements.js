@@ -3,7 +3,8 @@ import './announcements.css';
 import { useAuth } from '../context/AuthContext';
 
 // ✅ FIX: API URL mein /api/ prefix ensure karo
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:10000/api';
+const BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:10000';
+const API_BASE_URL = BASE_URL.endsWith('/api') ? BASE_URL : `${BASE_URL.replace(/\/$/, '')}/api`;
 
 const priorityColors = {
   low: 'text-slate-400 bg-slate-400/10 border-slate-400/20',
@@ -105,8 +106,8 @@ export default function Announcements() {
 
       console.log('✅ Push Subscription:', subscription);
 
-      // ✅ FIX: Correct API endpoint with /api/ prefix
-      const res = await fetch(`${API_BASE_URL}/api/push/subscribe`, {
+      // ✅ FIX: Removed double /api/
+      const res = await fetch(`${API_BASE_URL}/push/subscribe`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -132,7 +133,7 @@ export default function Announcements() {
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`${API_BASE_URL}/api/announcements`, {
+      const res = await fetch(`${API_BASE_URL}/announcements`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 

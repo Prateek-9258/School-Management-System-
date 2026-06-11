@@ -23,8 +23,8 @@ const apiCall = async (endpoint, options = {}) => {
     }
     return response.json();
   } catch (err) {
-    if (err.message === 'Failed to fetch') {
-      throw new Error('Backend not running. Start: cd backend && npm run dev');
+    if (err.name === 'TypeError' && err.message === 'Failed to fetch') {
+      throw new Error('Network error: Please check your internet connection or backend status.');
     }
     throw err;
   }

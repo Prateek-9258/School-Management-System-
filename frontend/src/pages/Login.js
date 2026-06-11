@@ -1,9 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
+const BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:10000';
+const API_BASE_URL = BASE_URL.endsWith('/api') ? BASE_URL : `${BASE_URL.replace(/\/$/, '')}/api`;
+
 export default function Login() {
-  const { login } = useAuth(); // loginOffline ki jagah login use karein
+  const { user, login } = useAuth(); // loginOffline ki jagah login use karein
   const navigate = useNavigate();
   const [credentials, setCredentials] = useState({ 
     username: '', 
@@ -11,6 +14,14 @@ export default function Login() {
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // ✅ Safe Logic: Agar user pehle se login hai toh dashboard pe bhej do
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (user || token) {
+      navigate('/', { replace: true });
+    }
+  }, [user, navigate]);
 
   // Forgot Password States
   const [showForgot, setShowForgot] = useState(false);
@@ -24,7 +35,7 @@ export default function Login() {
     localStorage.setItem('last_forgot_mobile', mobile); // Number ko save kiya
     setLoading(true);
     try { 
-      const res = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:10000'}/api/auth/forgot-password`, {
+      const res = await fetch(`${API_BASE_URL}/auth/forgot-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mobile })
@@ -54,7 +65,7 @@ export default function Login() {
   const handleResetPassword = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:10000'}/api/auth/reset-password`, {
+      const res = await fetch(`${API_BASE_URL}/auth/reset-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mobile, newPassword })

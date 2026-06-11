@@ -7,7 +7,8 @@ const NotificationBell = ({ userId = 'admin' }) => {
   const [unreadCount, setUnreadCount] = useState(0);
   const panelRef = useRef(null);
 
-  useEffect(() => { fetchNotifications(); const i = setInterval(fetchNotifications, 30000); return () => clearInterval(i); }, [userId]);
+  // ✅ Optimization: Interval ko 30s se badha kar 2 min kiya (mobile data bachaane ke liye)
+  useEffect(() => { fetchNotifications(); const i = setInterval(fetchNotifications, 120000); return () => clearInterval(i); }, [userId]);
   useEffect(() => { const h = (e) => { if (panelRef.current && !panelRef.current.contains(e.target)) setOpen(false); }; document.addEventListener('mousedown', h); return () => document.removeEventListener('mousedown', h); }, []);
 
   const fetchNotifications = async () => {

@@ -74,39 +74,31 @@ export default function Attendance() {
         ? { section: 'A' }
         : { class: filterClass, section: 'A' };
 
-      const stuRes = await getStudents(params);
+      // ✅ Parallel Fetching for Registry
+      const monthPrefix = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}`;
+      
+      const [stuRes, attRes] = await Promise.all([
+        getStudents(params),
+        getAttendanceByDate(monthPrefix, filterClass === 'all' ? '' : filterClass)
+      ]);
+
       const stuList = stuRes?.data || stuRes || [];
       let safeList = Array.isArray(stuList) ? stuList : [];
-
-      safeList.sort((a, b) => {
-        const classCompare = String(a.class).localeCompare(String(b.class), undefined, { numeric: true });
-        if (classCompare !== 0) return classCompare;
-        return String(a.rollNumber).localeCompare(String(b.rollNumber), undefined, { numeric: true });
-      });
 
       setStudents(safeList);
 
       const grid = {};
       safeList.forEach(s => { grid[s._id] = {}; });
 
-      if (safeList.length > 0 && dates.length > 0) {
-        // Fetch entire month in ONE call using prefix
-        const monthPrefix = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}`;
-        try {
-          const attRes = await getAttendanceByDate(monthPrefix, filterClass);
-          const attData = attRes?.data || attRes || [];
-          const safeAttData = Array.isArray(attData) ? attData : [];
+      const attData = attRes?.data || attRes || [];
+      const safeAttData = Array.isArray(attData) ? attData : [];
 
-          safeAttData.forEach(a => {
-            const sid = a.studentId?._id || a.studentId;
-            if (sid && grid[sid] !== undefined) {
-              grid[sid][a.date] = a.status;
-            }
-          });
-        } catch (e) {
-          console.log('Monthly attendance fetch failed');
+      safeAttData.forEach(a => {
+        const sid = a.studentId?._id || a.studentId;
+        if (sid && grid[sid] !== undefined) {
+          grid[sid][a.date] = a.status;
         }
-      }
+      });
 
       safeList.forEach(s => {
         dates.forEach(date => {

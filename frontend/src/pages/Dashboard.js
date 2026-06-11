@@ -42,54 +42,49 @@ const Dashboard = () => {
     try {
       setLoading(true);
 
-      let studentStats = { count: 0 };
-      let todayStats = { present: 0 };
-      let feeStats = { collected: 0, pending: 0 };
-      let pending = [];
+      // ✅ Parallel Fetching: Sabhi calls ek sath start hongi
+      const fetchPromises = [
+        getStudentStats(),
+        getTodayStats(),
+        getFeeStats(),
+        getPendingFees()
+      ];
 
-      try {
-        const res = await getStudentStats();
-        studentStats = res?.data || res || { total: 0, byClass: [] };
-      } catch (e) { console.log('Student stats error:', e); }
+      // Agar student hai toh uski profile bhi parallel mein fetch karo
+      if (isStudent) {
+        fetchPromises.push(getStudents({ search: user?.mobile || user?.username }));
+      }
 
-      try {
-        todayStats = await getTodayStats();
-      } catch (e) { console.log('Today stats error:', e); }
+      const results = await Promise.allSettled(fetchPromises);
 
-      try {
-        feeStats = await getFeeStats();
-      } catch (e) { console.log('Fee stats error:', e); }
+      // Result Extraction
+      const studentStats = results[0].status === 'fulfilled' ? (results[0].value?.data || results[0].value) : { total: 0, byClass: [] };
+      const todayStats = results[1].status === 'fulfilled' ? results[1].value : { present: 0 };
+      const feeStats = results[2].status === 'fulfilled' ? results[2].value : { collected: 0, pending: 0 };
+      
+      const pendingRes = results[3].status === 'fulfilled' ? results[3].value : [];
+      const rawPending = Array.isArray(pendingRes) ? pendingRes : (pendingRes?.data || pendingRes?.fees || []);
+      
+      let pending = (user?.role?.toLowerCase() === 'student' || user?.role?.toLowerCase() === 'parent')
+        ? rawPending.filter(f => f.studentId?.contact === user?.mobile)
+        : rawPending;
 
-      try {
-        const pendingRes = await getPendingFees();
-        const rawPending = Array.isArray(pendingRes) ? pendingRes : 
-                           (pendingRes?.data || pendingRes?.fees || []);
-        
-        // ✅ Student Privacy: Show only own pending fees
-        if (user?.role?.toLowerCase() === 'student' || user?.role?.toLowerCase() === 'parent') {
-          pending = rawPending.filter(f => f.studentId?.contact === user?.mobile);
-        } else {
-          pending = rawPending;
+      // Process Student Specific Data (Attendance)
+      if (isStudent && results[4]?.status === 'fulfilled') {
+        const stuRes = results[4].value;
+        const list = stuRes?.data?.data || stuRes?.data || stuRes || [];
+        const me = list.find(s => s.contact === user.mobile);
+        if (me) {
+          setStudentDetail(me);
+          const todayStr = new Date().toISOString().split('T')[0];
+          const attRes = await getAttendanceByDate(todayStr, me.class);
+          const attList = attRes?.data || attRes || [];
+          const myAtt = attList.find(a => (a.studentId?._id || a.studentId) === me._id);
+          setMyTodayStatus(myAtt ? (myAtt.status === 'P' ? 'Present' : (myAtt.status === 'A' ? 'Absent' : 'Leave')) : 'Not Marked');
         }
-      } catch (e) { console.log('Pending fees error:', e); }
+      }
 
       // ✅ NEW: Fetch Student Academic Info & Personal Attendance
-      if (isStudent) {
-        try {
-          const stuRes = await getStudents({ search: user?.mobile || user?.username });
-          const list = stuRes?.data?.data || stuRes?.data || stuRes || [];
-          const me = list.find(s => s.contact === user.mobile);
-          if (me) {
-            setStudentDetail(me);
-            // Check Today's status
-            const todayStr = new Date().toISOString().split('T')[0];
-            const attRes = await getAttendanceByDate(todayStr, me.class);
-            const attList = attRes?.data || attRes || [];
-            const myAtt = attList.find(a => (a.studentId?._id || a.studentId) === me._id);
-            setMyTodayStatus(myAtt ? (myAtt.status === 'P' ? 'Present' : (myAtt.status === 'A' ? 'Absent' : 'Leave')) : 'Not Marked');
-          }
-        } catch (e) { console.log('Personal data error:', e); }
-      }
 
       // ✅ Super-Robust Data Extraction
       let extractedByClass = [];

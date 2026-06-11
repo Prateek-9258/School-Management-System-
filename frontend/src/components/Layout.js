@@ -21,10 +21,25 @@ export default function Layout() {
   useEffect(() => { setSidebarOpen(false); }, [location.pathname]);
 
   useEffect(() => {
+    // ✅ Security Guard: Agar user ya token nahi hai, toh login par bhejo
+    const token = localStorage.getItem('token');
+    if (!user && !token) {
+      navigate('/login', { replace: true });
+    }
+
     const onResize = () => { if (window.innerWidth > 768) setSidebarOpen(false); };
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
-  }, []);
+  }, [user, navigate]);
+
+  // ✅ Don't render sidebar/header if not authenticated to prevent UI flicker
+  if (!user) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: 'var(--background)' }}>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="app-layout">
