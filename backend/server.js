@@ -37,28 +37,30 @@ mongoose.connect(process.env.MONGODB_URI, {
 // ============================================
 // ✅ WEB PUSH VAPID SETUP
 // ============================================
-webpush.setVapidDetails(
-  process.env.VAPID_SUBJECT || 'mailto:admin@school.com',
-  process.env.VAPID_PUBLIC_KEY,
-  process.env.VAPID_PRIVATE_KEY
-);
+if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+  webpush.setVapidDetails(
+    process.env.VAPID_SUBJECT || 'mailto:admin@school.com',
+    process.env.VAPID_PUBLIC_KEY,
+    process.env.VAPID_PRIVATE_KEY
+  );
+} else {
+  console.warn('⚠️ VAPID keys not set - push notifications disabled');
+}
 
 // ============================================
-// ✅ API ROUTES
+// ✅ PUSH NOTIFICATION APIs
 // ============================================
-
-// Push Notification APIs
 app.post('/api/push/subscribe', async (req, res) => {
   try {
     const { subscription, userId } = req.body;
-    
+
     if (!subscription || !subscription.endpoint) {
       return res.status(400).json({ error: 'Invalid subscription' });
     }
 
     await PushSubscription.findOneAndUpdate(
       { endpoint: subscription.endpoint },
-      { 
+      {
         endpoint: subscription.endpoint,
         keys: subscription.keys,
         userId: userId || null
@@ -76,7 +78,7 @@ app.post('/api/push/subscribe', async (req, res) => {
 app.post('/api/push/send', async (req, res) => {
   try {
     const { title, body, icon, url, userId } = req.body;
-    
+
     const payload = JSON.stringify({
       title: title || 'School Management',
       body: body || 'New notification',
@@ -88,7 +90,7 @@ app.post('/api/push/send', async (req, res) => {
     });
 
     let subscriptions;
-    
+
     if (userId) {
       subscriptions = await PushSubscription.find({ userId });
     } else {
@@ -96,7 +98,7 @@ app.post('/api/push/send', async (req, res) => {
     }
 
     const results = await Promise.allSettled(
-      subscriptions.map(sub => 
+      subscriptions.map(sub =>
         webpush.sendNotification(sub, payload)
           .catch(async err => {
             if (err.statusCode === 410 || err.statusCode === 404) {
@@ -111,11 +113,11 @@ app.post('/api/push/send', async (req, res) => {
     const success = results.filter(r => r.status === 'fulfilled').length;
     const failed = results.filter(r => r.status === 'rejected').length;
 
-    res.json({ 
-      success: true, 
-      sent: success, 
+    res.json({
+      success: true,
+      sent: success,
       failed: failed,
-      total: subscriptions.length 
+      total: subscriptions.length
     });
   } catch (err) {
     console.error('Send push error:', err);
@@ -132,7 +134,9 @@ app.get('/api/announcements/vapid-public-key', (req, res) => {
 });
 
 // ============================================
-// ✅ DYNAMIC ROUTE LOADING
+// ✅ DYNAMIC ROUTE LOADING (auth, students, attendance, fees, etc.)
+// This automatically loads every file inside /routes
+// So auth.js, students.js, attendance.js, fees.js are all covered here.
 // ============================================
 const routesDir = path.join(__dirname, 'routes');
 
@@ -143,7 +147,7 @@ if (fs.existsSync(routesDir)) {
 
       const routeName = file.replace('.js', '');
       let routePath;
-      
+
       if (routeName === 'auth') routePath = '/api/auth';
       else if (routeName === 'students') routePath = '/api/students';
       else if (routeName === 'attendance') routePath = '/api/attendance';
@@ -152,7 +156,7 @@ if (fs.existsSync(routesDir)) {
       else if (routeName === 'export') routePath = '/api/export';
       else if (routeName === 'importRoutes') routePath = '/api/import';
       else routePath = `/api/${routeName}`;
-      
+
       try {
         const routeModule = require(`./routes/${file}`);
         const router = routeModule.default || routeModule;
@@ -175,50 +179,52 @@ if (fs.existsSync(routesDir)) {
 // ============================================
 // ✅ HEALTH CHECK
 // ============================================
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', message: 'School API running', timestamp: new Date().toISOString() });
 });
 
 // ============================================
 // ✅ SERVE REACT FRONTEND (STATIC FILES)
+// IMPORTANT: This path MUST match your actual folder structure.
+// If server.js is inside /backend and React app is inside /frontend
+// (both siblings), this stays as '..', 'frontend', 'build'.
+// If your structure is different, change this line ONLY.
 // ============================================
-// Adjust path: use '../frontend/build' if server.js is in /backend/
-// Use 'frontend/build' if server.js is at project root
 const buildPath = path.join(__dirname, '..', 'frontend', 'build');
 
 if (fs.existsSync(buildPath)) {
+  console.log('✅ Frontend build found at:', buildPath);
+
   // Serve static files (JS, CSS, images) with correct MIME types
   app.use(express.static(buildPath, {
     setHeaders: (res, filePath) => {
       if (filePath.endsWith('.js')) {
-        res.setHeader('Content-Type', 'application/javascript');
+        res.setHeader('Content-Type', 'application/javascript; charset=UTF-8');
       } else if (filePath.endsWith('.css')) {
-        res.setHeader('Content-Type', 'text/css');
+        res.setHeader('Content-Type', 'text/css; charset=UTF-8');
       }
     }
   }));
 
   // Serve index.html for all non-API routes (React Router support)
   app.get('*', (req, res, next) => {
-    // Don't intercept API 404s - let them fall through
     if (req.path.startsWith('/api/')) {
       return next();
     }
     res.sendFile(path.join(buildPath, 'index.html'));
   });
-
-  console.log('✅ Serving React frontend from:', buildPath);
 } else {
-  console.warn('⚠️ Frontend build not found at:', buildPath);
+  console.warn('⚠️ Frontend build NOT found at:', buildPath);
+  console.warn('⚠️ Run "npm run build" inside the frontend folder and redeploy.');
 }
 
 // ============================================
 // ✅ 404 HANDLER (API routes only)
 // ============================================
 app.use((req, res) => {
-  res.status(404).json({ 
-    success: false, 
-    message: `Route not found: ${req.method} ${req.path}` 
+  res.status(404).json({
+    success: false,
+    message: `Route not found: ${req.method} ${req.path}`
   });
 });
 
