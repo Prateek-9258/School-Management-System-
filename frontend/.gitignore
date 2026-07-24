@@ -25,7 +25,6 @@ frontend/.pnp.js
 frontend/coverage
 
 # production
-# frontend/build
 frontend/dist
 
 # misc
