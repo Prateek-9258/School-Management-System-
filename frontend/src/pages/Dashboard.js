@@ -12,7 +12,7 @@ const Dashboard = () => {
     presentToday: 0,
     feesCollected: 0,
     feesPending: 0,
-    byClass: [] // ✅ Real chart data state
+    byClass: []
   });
   const [pendingFees, setPendingFees] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -25,7 +25,6 @@ const Dashboard = () => {
   useEffect(() => {
     loadDashboardData();
 
-    // Close notification dropdown when clicking outside
     const handleClickOutside = (event) => {
       if (notificationRef.current && !notificationRef.current.contains(event.target)) {
         setShowNotifications(false);
@@ -50,9 +49,11 @@ const Dashboard = () => {
         getPendingFees()
       ];
 
-      // Agar student hai toh uski profile bhi parallel mein fetch karo
+      // Agar student/parent hai toh profile + aaj ki attendance bhi parallel mein fetch karo
+      const todayDateStr = new Date().toISOString().split('T')[0];
       if (isStudent) {
         fetchPromises.push(getStudents({ search: user?.mobile || user?.username }));
+        fetchPromises.push(getAttendanceByDate(todayDateStr)); // index 5
       }
 
       const results = await Promise.allSettled(fetchPromises);
@@ -62,24 +63,50 @@ const Dashboard = () => {
       const todayStats = results[1].status === 'fulfilled' ? results[1].value : { present: 0 };
       const feeStats = results[2].status === 'fulfilled' ? results[2].value : { collected: 0, pending: 0 };
       const pendingRes = results[3].status === 'fulfilled' ? results[3].value : [];
-      
+
       const rawPending = Array.isArray(pendingRes) ? pendingRes : (pendingRes?.data || pendingRes?.fees || []);
       let pending = (user?.role?.toLowerCase() === 'student' || user?.role?.toLowerCase() === 'parent')
         ? rawPending.filter(f => f.studentId?.contact === user?.mobile)
         : rawPending;
 
-      // ✅ Mobile Optimization: Attendance summary fetch in parallel
+      // ✅ Student profile match
+      let myStudentRecord = null;
       if (isStudent && results[4]?.status === 'fulfilled') {
         const stuRes = results[4].value;
         const list = stuRes?.data?.data || stuRes?.data || stuRes || [];
         const me = list.find(s => s.contact === user.mobile);
         if (me) {
+          myStudentRecord = me;
           setStudentDetail(me);
-          // Today's status check can also be moved to a parallel call if needed
         }
       }
 
-      // ✅ NEW: Fetch Student Academic Info & Personal Attendance
+      // ✅ FIX: Aaj ka attendance status set karo
+      if (isStudent) {
+        if (results[5]?.status === 'fulfilled') {
+          const attRes = results[5].value;
+          const attList = attRes?.data?.data || attRes?.data || attRes || [];
+          const safeAttList = Array.isArray(attList) ? attList : [];
+
+          const myRecord = safeAttList.find(a => {
+            const recordStudentId = a.studentId?._id || a.studentId;
+            return (
+              recordStudentId === myStudentRecord?._id ||
+              a.rollNumber === myStudentRecord?.rollNumber ||
+              a.contact === user?.mobile
+            );
+          });
+
+          if (myRecord?.status) {
+            // Backend ke status ko normalize karo (Present/Absent/Leave etc.)
+            setMyTodayStatus(myRecord.status);
+          } else {
+            setMyTodayStatus('Not Marked');
+          }
+        } else {
+          setMyTodayStatus('Not Marked');
+        }
+      }
 
       // ✅ Super-Robust Data Extraction
       let extractedByClass = [];
@@ -87,17 +114,15 @@ const Dashboard = () => {
         if (Array.isArray(studentStats.byClass)) extractedByClass = studentStats.byClass;
         else if (Array.isArray(studentStats.data)) extractedByClass = studentStats.data;
         else if (Array.isArray(studentStats)) extractedByClass = studentStats;
-        // Agar data object format mein ho { "Class 1": 10 }
         else if (typeof studentStats === 'object' && !studentStats.total) {
           extractedByClass = Object.entries(studentStats).map(([key, val]) => ({ _id: key, count: val }));
         }
       }
 
-      // ✅ Fix: Reducer check for all possible count keys
-      const extractedTotal = 
-        studentStats?.total || 
-        studentStats?.count || 
-        (Array.isArray(studentStats) ? studentStats.length : 0) || 
+      const extractedTotal =
+        studentStats?.total ||
+        studentStats?.count ||
+        (Array.isArray(studentStats) ? studentStats.length : 0) ||
         extractedByClass.reduce((acc, curr) => acc + Number(curr.count || curr.total || curr.students || 0), 0);
 
       setStats({
@@ -131,12 +156,10 @@ const Dashboard = () => {
   const safePendingFees = Array.isArray(pendingFees) ? pendingFees : [];
   const displayFees = safePendingFees.slice(0, 5);
 
-  // ✅ NEW: Show chart according to Classes (1-8) instead of just existing student data
   const SCHOOL_CLASSES = ['1', '2', '3', '4', '5', '6', '7', '8'];
   const rawByClass = stats.byClass || [];
-  
+
   const classData = SCHOOL_CLASSES.map(cls => {
-    // Find data for this specific class in the stats
     const found = rawByClass.find(c => String(c._id || c.class) === cls);
     return {
       name: `Class ${cls}`,
@@ -145,13 +168,11 @@ const Dashboard = () => {
   });
 
   const rawMax = Math.max(...classData.map(c => c.count || 0), 1);
-  const maxCount = rawMax > 0 ? rawMax * 1.2 : 10; // Ensure maxCount is never 0 to avoid division by zero
+  const maxCount = rawMax > 0 ? rawMax * 1.2 : 10;
 
   return (
-    /* WRAPPER DIV ADDED - Ensures full dark background */
     <div className="dashboard-wrapper relative">
       <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-8">
-        {/* Header Section */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-50">
           <div>
             <h1 className="text-4xl font-extrabold text-white tracking-tight">
@@ -165,11 +186,10 @@ const Dashboard = () => {
             )}
           </div>
         <div className="flex items-center gap-3 flex-wrap justify-start lg:justify-end mt-2 lg:mt-0">
-          {/* Notification Bell Integrated into Header Actions */}
           <div className="relative" ref={notificationRef}>
-            <button 
+            <button
               onClick={() => setShowNotifications(!showNotifications)}
-              className="notification-btn group" 
+              className="notification-btn group"
               title="Notifications"
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -210,7 +230,7 @@ const Dashboard = () => {
 
           {isAdmin && (
             <>
-          <button 
+          <button
             onClick={() => exportStudentsPDF('')}
             className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold transition-all shadow-lg shadow-indigo-500/30 active:scale-95 group whitespace-nowrap"
             style={{ padding: '10px 20px', fontSize: '13px', minHeight: '44px', border: 'none', cursor: 'pointer' }}
@@ -218,7 +238,7 @@ const Dashboard = () => {
             <svg className="w-5 h-5 group-hover:animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" /></svg>
             <span>Students PDF</span>
           </button>
-          <button 
+          <button
             onClick={() => exportPendingFeesPDF()}
             className="flex items-center justify-center gap-2 bg-rose-600 hover:bg-rose-500 text-white rounded-xl font-bold transition-all shadow-lg shadow-rose-500/30 active:scale-95 group whitespace-nowrap"
             style={{ padding: '10px 20px', fontSize: '13px', minHeight: '44px', border: 'none', cursor: 'pointer' }}
@@ -237,48 +257,47 @@ const Dashboard = () => {
             const studentTotalDue = pendingFees.reduce((acc, curr) => acc + (curr.amount || 0), 0);
             const totalPotential = stats.feesCollected + stats.feesPending;
             const collectionRate = totalPotential > 0 ? Math.round((stats.feesCollected / totalPotential) * 100) : 0;
-            
+
             const items = isStudent ? [
-              { 
-                label: 'Attendance Status', 
-                value: myTodayStatus, 
+              {
+                label: 'Attendance Status',
+                value: myTodayStatus,
                 icon: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z',
                 theme: { text: myTodayStatus === 'Present' ? 'text-green-400' : 'text-amber-400', bg: 'bg-indigo-500/10', border: 'hover:border-indigo-500/50', glow: 'group-hover:bg-indigo-500/20', dot: 'bg-indigo-400' }
               },
-              { 
-                label: 'Total Due Fees', 
-                value: `₹${studentTotalDue.toLocaleString()}`, 
-                icon: 'M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z', 
+              {
+                label: 'Total Due Fees',
+                value: `₹${studentTotalDue.toLocaleString()}`,
+                icon: 'M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
                 theme: { text: 'text-rose-400', bg: 'bg-rose-500/10', border: 'hover:border-rose-500/50', glow: 'group-hover:bg-rose-500/20', dot: 'bg-rose-400' }
               }
             ] : [
-            {  
-              label: 'Total Students', 
-              value: stats.totalStudents, 
+            {
+              label: 'Total Students',
+              value: stats.totalStudents,
               icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z',
               theme: { text: 'text-indigo-400', bg: 'bg-indigo-500/10', border: 'hover:border-indigo-500/50', glow: 'group-hover:bg-indigo-500/20', dot: 'bg-indigo-400' }
             },
-            { 
-              label: 'Present Today', 
-              value: stats.presentToday, 
-              icon: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z', 
+            {
+              label: 'Present Today',
+              value: stats.presentToday,
+              icon: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z',
               theme: { text: 'text-green-400', bg: 'bg-green-500/10', border: 'hover:border-green-500/50', glow: 'group-hover:bg-green-500/20', dot: 'bg-green-400' }
             },
-            { 
-              label: 'Fees Collected', 
-              value: `₹${stats.feesCollected.toLocaleString()}`, 
-              icon: 'M9 8h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z', 
+            {
+              label: 'Fees Collected',
+              value: `₹${stats.feesCollected.toLocaleString()}`,
+              icon: 'M9 8h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',
               theme: { text: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'hover:border-emerald-500/50', glow: 'group-hover:bg-emerald-500/20', dot: 'bg-emerald-400' }
             },
-            { 
-              label: 'Fees Pending', 
-              value: `₹${stats.feesPending.toLocaleString()}`, 
-              icon: 'M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z', 
+            {
+              label: 'Fees Pending',
+              value: `₹${stats.feesPending.toLocaleString()}`,
+              icon: 'M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
               theme: { text: 'text-rose-400', bg: 'bg-rose-500/10', border: 'hover:border-rose-500/50', glow: 'group-hover:bg-rose-500/20', dot: 'bg-rose-400' }
             }
           ];
 
-          // Filter items based on role
           const visibleItems = (isAdmin || isStudent) ? items : items.slice(0, 2);
 
           return visibleItems.map((item, idx) => (
@@ -295,8 +314,8 @@ const Dashboard = () => {
               </div>
               {item.label === 'Fees Collected' && (
                 <div className="mt-3 w-full bg-slate-700/50 rounded-full h-1.5 overflow-hidden">
-                  <div 
-                    className="bg-emerald-500 h-full transition-all duration-1000" 
+                  <div
+                    className="bg-emerald-500 h-full transition-all duration-1000"
                     style={{ width: `${collectionRate}%` }}
                   />
                 </div>
@@ -310,7 +329,6 @@ const Dashboard = () => {
             </div>
           ));
           })()}
-          {/* Note: Logic above wrapped in IIFE for stats calculation */}
         </div>
 
         {/* Quick Actions */}
@@ -323,8 +341,8 @@ const Dashboard = () => {
               { label: 'Students List', path: '/students', icon: '👤', color: 'bg-indigo-500' },
               { label: 'Broadcast', path: '/announcements', icon: '📢', color: 'bg-amber-500' }
             ].filter(a => !a.hide).map((act, i) => (
-              <Link 
-                key={i} 
+              <Link
+                key={i}
                 to={act.path}
                 className="flex flex-col md:flex-row items-center gap-3 p-4 bg-slate-800/50 hover:bg-slate-700/50 border border-slate-700/50 rounded-xl transition-all hover:-translate-y-1 group text-center md:text-left"
               >
@@ -351,11 +369,11 @@ const Dashboard = () => {
                   <div className="bar-tooltip z-20">
                       {cls.count} Students
                     </div>
-                    <div 
+                    <div
                     className="bar"
-                      style={{ 
-                        height: `${Math.max((cls.count / maxCount) * 100, 2)}%`, // At least 2% height for visibility
-                        animationDelay: `${idx * 0.1}s` // Staggered animation delay
+                      style={{
+                        height: `${Math.max((cls.count / maxCount) * 100, 2)}%`,
+                        animationDelay: `${idx * 0.1}s`
                       }}
                     ></div>
                   </div>
@@ -397,13 +415,13 @@ const Dashboard = () => {
                       <div className="flex items-center gap-3">
                         <p className="text-rose-400 font-black text-lg">₹{fee?.amount || 0}</p>
                         {!isStudent && (
-                        <button 
+                        <button
                           onClick={async (e) => {
                             e.stopPropagation();
                             if(!window.confirm('Mark this fee as Paid?')) return;
                             try {
                               await updateFee(fee._id, { status: 'Paid', paidDate: new Date() });
-                              loadDashboardData(); // Data refresh taaki stats update ho jayein
+                              loadDashboardData();
                             } catch (e) { alert('Update failed'); }
                           }}
                           className="px-4 py-2 bg-green-600/10 hover:bg-green-600 text-green-400 hover:text-white text-[12px] font-black rounded-lg border border-green-500/30 transition-all cursor-pointer uppercase tracking-wider"
@@ -412,7 +430,6 @@ const Dashboard = () => {
                         </button>
                         )}
                       </div>
-                      {/* ✅ Fallback in Recent Pending Dues section */}
                       <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest opacity-60">
                         Due: {(fee?.dueDate || fee?.date) ? new Date(fee.dueDate || fee.date).toLocaleDateString() : 'Pending'}
                       </p>

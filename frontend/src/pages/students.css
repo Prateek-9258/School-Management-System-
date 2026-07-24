@@ -104,3 +104,134 @@
   transform: rotate(90deg);
   color: var(--red);
 }
+
+/* ===== ✅ NEW: extra "attractive" polish for the desktop table ===== */
+/* Adds a left accent border on hover instead of just a background
+   change — a small detail that makes the table feel more alive. */
+.table-wrap tbody tr {
+  border-left: 3px solid transparent;
+}
+.table-wrap tbody tr:hover {
+  border-left-color: var(--accent);
+}
+
+.table-wrap table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.table-wrap thead th {
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+  z-index: 1;
+}
+
+/* ===== ✅ NEW: MOBILE CARD VIEW (used instead of the table below 641px,
+   see Students.jsx `useIsMobile` / `renderStudentCards`) ===== */
+
+.student-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.student-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px 16px;
+  transition: border-color 0.15s ease, transform 0.1s ease;
+}
+
+.student-card:active {
+  transform: scale(0.99);
+}
+
+.student-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.student-card-name {
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--text);
+}
+
+.student-card-roll {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.student-card-att {
+  border: none;
+  cursor: pointer;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.student-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.student-card-contact {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.student-card-whatsapp {
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--green);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.student-card-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.student-card-actions .btn {
+  flex: 1;
+  justify-content: center;
+  font-size: 12px;
+  padding: 9px 10px;
+}
+
+/* ===== ✅ NEW: responsive tweaks for the toolbar on very small phones ===== */
+@media (max-width: 480px) {
+  .toolbar {
+    flex-direction: column;
+  }
+  .search-box,
+  .filter-select {
+    width: 100%;
+    min-width: 0;
+  }
+}

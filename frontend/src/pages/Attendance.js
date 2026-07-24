@@ -10,6 +10,22 @@ const monthNames = [
   'July','August','September','October','November','December'
 ];
 
+// ✅ NEW: simple hook to detect mobile viewport so we can switch
+// between the desktop grid table and the mobile card layout.
+function useIsMobile(breakpoint = 641) {
+  const [isMobile, setIsMobile] = useState(
+    () => typeof window !== 'undefined' ? window.innerWidth < breakpoint : false
+  );
+
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < breakpoint);
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, [breakpoint]);
+
+  return isMobile;
+}
+
 export default function Attendance() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -23,6 +39,8 @@ export default function Attendance() {
   const [saving,        setSaving]        = useState(false);
   const [saved,         setSaved]         = useState(false);
   const [toast,         setToast]         = useState(null);
+
+  const isMobile = useIsMobile(); // ✅ NEW
 
   const classes = ['1','2','3','4','5','6','7','8'];
 
@@ -39,7 +57,6 @@ export default function Attendance() {
     setTimeout(() => setToast(null), 3000);
   };
 
-  // Chunk array helper for 413 fix
   const chunkArray = (array, size) => {
     const chunks = [];
     for (let i = 0; i < array.length; i += size) {
@@ -67,6 +84,11 @@ export default function Attendance() {
   const isSunday = (dateStr) => new Date(dateStr).getDay() === 0;
   const isToday  = (dateStr) => dateStr === today.toISOString().split('T')[0];
 
+  // ✅ single source of truth for column widths.
+  // Both header row and every student row use this SAME string,
+  // so columns can never drift apart — no <table> auto-width guessing involved.
+  const gridTemplate = `var(--col-name) repeat(${dates.length}, var(--col-date)) var(--col-total)`;
+
   const fetchAll = async () => {
     setLoading(true);
     try {
@@ -74,9 +96,8 @@ export default function Attendance() {
         ? { section: 'A' }
         : { class: filterClass, section: 'A' };
 
-      // ✅ Parallel Fetching for Registry
       const monthPrefix = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}`;
-      
+
       const [stuRes, attRes] = await Promise.all([
         getStudents(params),
         getAttendanceByDate(monthPrefix, filterClass === 'all' ? '' : filterClass)
@@ -110,20 +131,19 @@ export default function Attendance() {
     } catch (err) {
       console.error('FetchAll error:', err);
       showToast('Failed to load data', 'error');
-    } finally { 
-      setLoading(false); 
+    } finally {
+      setLoading(false);
     }
   };
 
   useEffect(() => { fetchAll(); }, [selectedMonth, selectedYear, filterClass]);
 
-  // Mark all students present for TODAY
   const markAllPresentToday = () => {
     const todayStr = new Date().toISOString().split('T')[0];
     if (!dates.includes(todayStr)) {
       return showToast("Fast-mark only works if today is in the selected month", "error");
     }
-    
+
     setAttGrid(prev => {
       const newGrid = { ...prev };
       students.forEach(s => {
@@ -149,9 +169,25 @@ export default function Attendance() {
     });
   };
 
-  // ✅ FIXED: Sequential chunked save to prevent race conditions
+  // ✅ NEW: used by the compact mobile card view — one tap cycles
+  // through blank -> Present -> Absent -> blank, saving space vs
+  // showing two separate P/A buttons per day.
+  const cycleStatus = (studentId, date) => {
+    setAttGrid(prev => {
+      const current = prev[studentId]?.[date] || '';
+      const next = current === '' ? 'P' : current === 'P' ? 'A' : '';
+      return {
+        ...prev,
+        [studentId]: {
+          ...prev[studentId],
+          [date]: next
+        }
+      };
+    });
+  };
+
   const handleSave = async () => {
-    setSaving(true); 
+    setSaving(true);
     setSaved(false);
 
     try {
@@ -159,7 +195,6 @@ export default function Attendance() {
       dates.forEach(date => {
         students.forEach(s => {
           const status = attGrid[s._id]?.[date] || '';
-          // ✅ FIX: Only save records with actual status (skip empty)
           if (status) {
             allRecords.push({
               studentId: s._id,
@@ -172,10 +207,8 @@ export default function Attendance() {
         });
       });
 
-      // ✅ FIX: Smaller chunk size (500) for reliability
       const chunks = chunkArray(allRecords, 500);
-      
-      // ✅ FIX: Sequential save instead of Promise.all to avoid race conditions
+
       let totalSaved = 0;
       for (let i = 0; i < chunks.length; i++) {
         const chunk = chunks[i];
@@ -191,8 +224,8 @@ export default function Attendance() {
     } catch (err) {
       console.error('Save error:', err);
       showToast(err.message || 'Failed to save attendance', 'error');
-    } finally { 
-      setSaving(false); 
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -211,55 +244,132 @@ export default function Attendance() {
       }, {})
     : { [filterClass]: students };
 
-  const thStyle = (sticky = false) => ({
-    padding: '8px 4px',
-    textAlign: 'center',
-    background: 'var(--surface2)',
-    borderBottom: '1px solid var(--border)',
-    borderRight: '1px solid var(--border)',
-    fontWeight: '600',
-    color: 'var(--muted)',
-    fontSize: '10px',
-    position: sticky ? 'sticky' : 'static',
-    left: sticky ? 0 : 'auto',
-    zIndex: sticky ? 2 : 1,
-    whiteSpace: 'nowrap'
-  });
+  // ===== Desktop / tablet view: grid-based table =====
+  const renderGridTable = (stuList) => (
+    <div className="card att-grid-wrap">
+      <div className="att-grid" style={{ gridTemplateColumns: gridTemplate }}>
+        {/* Header row */}
+        <div className="att-row att-header-row" style={{ gridTemplateColumns: gridTemplate }}>
+          <div className="att-cell att-cell-name att-sticky-col att-header-cell">Student</div>
+          {dates.map(d => (
+            <div
+              key={d}
+              className={`att-cell att-cell-date att-header-cell ${isToday(d) ? 'att-today' : ''} ${isSunday(d) ? 'att-sunday' : ''}`}
+            >
+              <div className="att-day-label">{dayLabel(d)}</div>
+              <div className="att-day-num">{parseInt(d.split('-')[2])}</div>
+            </div>
+          ))}
+          <div className="att-cell att-cell-total att-header-cell">Total</div>
+        </div>
 
-  const tdStyle = () => ({
-    padding: '4px 3px',
-    borderBottom: '1px solid var(--border)',
-    borderRight: '1px solid var(--border)',
-    verticalAlign: 'middle',
-    textAlign: 'center'
-  });
+        {/* Student rows */}
+        {stuList.map((s, idx) => {
+          const { present, absent } = getSummary(s._id);
+          return (
+            <div
+              key={s._id}
+              className="att-row"
+              style={{
+                gridTemplateColumns: gridTemplate,
+                background: idx % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.02)'
+              }}
+            >
+              <div
+                className="att-cell att-cell-name att-sticky-col"
+                style={{ background: idx % 2 === 0 ? 'var(--surface)' : 'var(--surface2)' }}
+              >
+                <div className="att-student-name">{s.name}</div>
+                <div className="att-student-roll">Roll {s.rollNumber}</div>
+              </div>
 
-  const renderTable = (stuList) => (
-    <div className="card" style={{ padding:0, overflowX:'auto', marginBottom:'24px' }}>
-      <table style={{ borderCollapse:'collapse', minWidth:'100%', fontSize:'12px' }}>
-        <thead>
-          <tr><th style={thStyle(true)}>Student</th>{dates.map(d => (<th key={d} style={{ ...thStyle(), background: isToday(d) ? 'var(--accent)' : isSunday(d) ? 'rgba(239,68,68,0.1)' : 'var(--surface2)', color: isToday(d) ? '#fff' : isSunday(d) ? 'var(--red)' : 'var(--muted)', minWidth: '60px', padding: '8px 2px' }}><div style={{ fontSize:'10px' }}>{dayLabel(d)}</div><div style={{ fontWeight:'700', fontSize:'13px' }}>{parseInt(d.split('-')[2])}</div></th>))}<th style={{ ...thStyle(), minWidth:'80px' }}>Total</th></tr>
-        </thead>
-        <tbody>
-          {stuList.map((s, idx) => {
-            const { present, absent } = getSummary(s._id);
-            return (
-              <tr key={s._id} style={{ background: idx % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.02)' }}>
-                <td style={{ ...tdStyle(), minWidth: '110px', textAlign: 'left', padding: '6px 10px', fontWeight: '500', position: 'sticky', left: 0, background: idx % 2 === 0 ? 'var(--surface)' : 'var(--surface2)', zIndex: 1 }}><div>{s.name}</div><div style={{ fontSize:'11px', color:'var(--muted)' }}>Roll {s.rollNumber}</div>
-                </td>{dates.map(date => { const status = attGrid[s._id]?.[date] || ''; return ( <td key={date} style={tdStyle()}><div style={{ display:'flex', gap:'5px', justifyContent:'center', padding: '4px 0' }}><button onClick={() => setStatus(s._id, date, 'P')} style={{ width: '26px', height: '26px', borderRadius: '6px', border: status === 'P' ? '2px solid var(--green)' : '1px solid var(--border)', cursor: 'pointer', fontWeight: '700', fontSize: '11px', background: status === 'P' ? 'rgba(34,197,94,0.2)' : 'transparent', color: status === 'P' ? 'var(--green)' : 'var(--muted)', transition: 'all 0.1s', lineHeight: 1 }}>P</button><button onClick={() => setStatus(s._id, date, 'A')} style={{ width: '26px', height: '26px', borderRadius: '6px', border: status === 'A' ? '2px solid var(--red)' : 
-                  '1px solid var(--border)', cursor: 'pointer', fontWeight: '700', fontSize: '11px', background: status === 'A' ? 'rgba(239,68,68,0.2)' : 'transparent', color: status === 'A' ? 'var(--red)' : 'var(--muted)', transition: 'all 0.1s', lineHeight: 1 }}>A</button></div></td> ); })}<td style={{ ...tdStyle(), fontWeight:'600' }}><span style={{ color:'var(--green)', fontSize:'12px' }}>{present}P</span>{' / '}
-                  <span style={{ color:'var(--red)', fontSize:'12px' }}>{absent}A</span></td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+              {dates.map(date => {
+                const status = attGrid[s._id]?.[date] || '';
+                return (
+                  <div key={date} className="att-cell att-cell-date">
+                    <div className="att-btn-group">
+                      <button
+                        onClick={() => setStatus(s._id, date, 'P')}
+                        className={`att-btn ${status === 'P' ? 'att-btn-present' : ''}`}
+                      >
+                        P
+                      </button>
+                      <button
+                        onClick={() => setStatus(s._id, date, 'A')}
+                        className={`att-btn ${status === 'A' ? 'att-btn-absent' : ''}`}
+                      >
+                        A
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+
+              <div className="att-cell att-cell-total">
+                <span className="att-present-count">{present}P</span>
+                {' / '}
+                <span className="att-absent-count">{absent}A</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
+  );
+
+  // ===== Mobile view: one card per student =====
+  const renderCardView = (stuList) => (
+    <div className="att-cards-wrap">
+      {stuList.map(s => {
+        const { present, absent } = getSummary(s._id);
+        return (
+          <div key={s._id} className="att-card">
+            <div className="att-card-header">
+              <div>
+                <div className="att-card-name">{s.name}</div>
+                <div className="att-card-roll">Roll {s.rollNumber}</div>
+              </div>
+              <div className="att-card-summary">
+                <span className="att-present-count">{present}P</span>
+                {' / '}
+                <span className="att-absent-count">{absent}A</span>
+              </div>
+            </div>
+
+            <div className="att-card-days">
+              {dates.map(date => {
+                const status = attGrid[s._id]?.[date] || '';
+                const stateClass =
+                  status === 'P' ? 'att-chip-present' :
+                  status === 'A' ? 'att-chip-absent' : '';
+                return (
+                  <button
+                    key={date}
+                    onClick={() => cycleStatus(s._id, date)}
+                    className={`att-day-chip ${isToday(date) ? 'att-chip-today' : ''} ${isSunday(date) ? 'att-chip-sunday' : ''}`}
+                  >
+                    <span className="att-day-chip-label">
+                      {dayLabel(date)} {parseInt(date.split('-')[2])}
+                    </span>
+                    <span className={`att-day-chip-status ${stateClass}`}>
+                      {status || '–'}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+
+  const renderStudents = (stuList) => (
+    isMobile ? renderCardView(stuList) : renderGridTable(stuList)
   );
 
   return (
     <div>
-      {/* Toast Notification */}
       {toast && (
         <div className={`fixed bottom-4 right-4 ${toast.type === 'error' ? 'bg-red-500' : 'bg-green-500'} text-white px-4 py-3 rounded-lg shadow-lg z-50 text-sm font-medium animate-fade-in`}>
           {toast.message}
@@ -272,29 +382,13 @@ export default function Attendance() {
           <p className="text-slate-400 mt-1 text-base"><strong>{monthNames[selectedMonth]} {selectedYear}</strong> — Monthly Attendance Sheet</p>
         </div>
         <div style={{ display: 'flex', gap: '10px' }}>
-          <button 
+          <button
             onClick={() => exportAttendancePDF(monthNames[selectedMonth], selectedYear, filterClass)}
-            style={{
-              padding: '10px 16px',
-              borderRadius: '10px',
-              border: '1px solid rgba(79, 142, 247, 0.25)',
-              background: 'rgba(79, 142, 247, 0.05)',
-              color:'var(--accent)',
-              cursor:'pointer',
-              fontSize:'13px',
-              fontWeight: '600',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              transition: 'all 0.2s ease'
-            }}
-            onMouseEnter={e => e.currentTarget.style.background = 'rgba(79, 142, 247, 0.12)'}
-            onMouseLeave={e => e.currentTarget.style.background = 'rgba(79, 142, 247, 0.05)'}
+            className="btn-export"
           >
             <span style={{ fontSize: '14px' }}>📄</span> Export PDF
           </button>
-          {/* ✅ FIX: Mark All Present button */}
-          <button 
+          <button
             onClick={markAllPresentToday}
             disabled={saving}
             style={{
@@ -311,8 +405,6 @@ export default function Attendance() {
               gap: '6px',
               transition: 'all 0.2s ease'
             }}
-            onMouseEnter={e => e.currentTarget.style.background = 'rgba(34, 197, 94, 0.12)'}
-            onMouseLeave={e => e.currentTarget.style.background = 'rgba(34, 197, 94, 0.05)'}
           >
             <span style={{ fontSize: '14px' }}>✅</span> Mark All Present
           </button>
@@ -344,20 +436,15 @@ export default function Attendance() {
       ) : filterClass === 'all' ? (
         Object.entries(groupedStudents).map(([cls, stuList]) => (
           <div key={cls}>
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: '10px',
-              margin: '8px 0 10px', padding: '8px 14px',
-              background: 'var(--surface2)', borderRadius: '8px',
-              borderLeft: '3px solid var(--accent)'
-            }}>
-              <span style={{ fontWeight:'700', fontSize:'15px', color:'var(--accent)' }}>Class {cls}</span>
-              <span style={{ fontSize:'13px', color:'var(--muted)' }}>{stuList.length} students</span>
+            <div className="class-group-header">
+              <span className="class-name">Class {cls}</span>
+              <span className="student-count">{stuList.length} students</span>
             </div>
-            {renderTable(stuList)}
+            {renderStudents(stuList)}
           </div>
         ))
       ) : (
-        renderTable(students)
+        renderStudents(students)
       )}
     </div>
   );

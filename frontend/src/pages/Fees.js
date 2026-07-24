@@ -212,12 +212,25 @@ export default function Fees() {
   const statusColor = { Paid:'badge-green', Pending:'badge-red', Partial:'badge-yellow' };
 
   return (
-    <div style={{ display:'flex', flexWrap: 'wrap', gap:'20px', minHeight:'calc(100vh - 120px)' }}>
+    <div className="fees-layout" style={{ display:'flex', flexWrap: 'wrap', gap:'20px', minHeight:'calc(100vh - 120px)' }}>
 
-      {/* ✅ CSS to hide scrollbar on mobile when a student is selected */}
+      {/* ✅ FIX: mobile-responsive rules —
+          1) stacks the two panels full-width on small screens instead of squeezing side by side
+          2) caps modal width so Add Fee / Bulk Generate modals don't overflow small phone screens
+          3) keeps the existing scrollbar-hide rule as-is */}
       <style>
         {`
           @media (max-width: 768px) {
+            .fees-layout { flex-direction: column !important; }
+            .fees-layout > * { max-width: 100% !important; width: 100% !important; }
+            /* ✅ FIX: without this, the students panel collapses to almost
+               zero height once panels stack in a column, because its
+               flex:1 inner list has no fixed-height ancestor to grow into.
+               A fixed max-height gives it room to show several students
+               with its own internal scroll, while the rest of the page
+               (fee details below) still scrolls normally. */
+            .fees-students-panel { max-height: 420px !important; }
+            .modal { width: 92vw !important; max-width: 92vw !important; }
             ${selectedStudent ? `
               .no-scrollbar-mobile::-webkit-scrollbar { display: none !important; }
               .no-scrollbar-mobile { -ms-overflow-style: none !important; scrollbar-width: none !important; }
@@ -228,7 +241,7 @@ export default function Fees() {
 
       {/* LEFT PANEL — Students List (Hidden for Student Role) */}
       {!isStudentOrParent && (
-      <div style={{
+      <div className="fees-students-panel" style={{
         width: '100%', maxWidth: '300px', flex: '1 1 300px',
         background: 'var(--surface)', border: '1px solid var(--border)',
         borderRadius: 'var(--radius)', display: 'flex', flexDirection: 'column',
@@ -578,9 +591,9 @@ export default function Fees() {
               ) : (
                 <div 
                   className={selectedStudent ? "no-scrollbar-mobile" : ""} 
-                  style={{ overflowY:'auto', flex:1 }}
+                  style={{ overflowY:'auto', overflowX:'auto', flex:1 }}
                 >
-                  <table style={{ width:'100%', borderCollapse:'collapse', fontSize:'14px' }}>
+                  <table style={{ width:'100%', borderCollapse:'collapse', fontSize:'14px', minWidth: '640px' }}>
                     <thead style={{ position:'sticky', top:0, background:'var(--surface)', zIndex:1 }}>
                       <tr><th style={{ padding:'11px 16px', textAlign:'left', fontSize:'11px', fontWeight:'600', textTransform:'uppercase', letterSpacing:'0.5px', color:'var(--muted)', borderBottom:'1px solid var(--border)' }}>Month</th><th style={{ padding:'11px 16px', textAlign:'left', fontSize:'11px', fontWeight:'600', textTransform:'uppercase', letterSpacing:'0.5px', color:'var(--muted)', borderBottom:'1px solid var(--border)' }}>Fee Type</th><th style={{ padding:'11px 16px', textAlign:'left', fontSize:'11px', fontWeight:'600', textTransform:'uppercase', letterSpacing:'0.5px', color:'var(--muted)', borderBottom:'1px solid var(--border)' }}>Method</th><th style={{ padding:'11px 16px', textAlign:'left', fontSize:'11px', fontWeight:'600', textTransform:'uppercase', letterSpacing:'0.5px', color:'var(--muted)', borderBottom:'1px solid var(--border)' }}>Amount</th><th style={{ padding:'11px 16px', textAlign:'left', fontSize:'11px', fontWeight:'600', textTransform:'uppercase', letterSpacing:'0.5px', color:'var(--muted)', borderBottom:'1px solid var(--border)' }}>Due Date</th><th style={{ padding:'11px 16px', textAlign:'left', fontSize:'11px', fontWeight:'600', textTransform:'uppercase', letterSpacing:'0.5px', color:'var(--muted)', borderBottom:'1px solid var(--border)' }}>Status</th>{user?.role?.toLowerCase() === 'admin' && (<th style={{ padding:'11px 16px', textAlign:'left', fontSize:'11px', fontWeight:'600', textTransform:'uppercase', letterSpacing:'0.5px', color:'var(--muted)', borderBottom:'1px solid var(--border)' }}>Action</th>)}</tr>
                     </thead>

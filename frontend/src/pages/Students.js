@@ -34,6 +34,22 @@ const fieldStyle = {
   transition: 'border-color 0.2s ease'
 };
 
+// ✅ NEW: simple hook to detect mobile viewport so we can switch
+// between the desktop table and the mobile card layout.
+function useIsMobile(breakpoint = 641) {
+  const [isMobile, setIsMobile] = useState(
+    () => typeof window !== 'undefined' ? window.innerWidth < breakpoint : false
+  );
+
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < breakpoint);
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, [breakpoint]);
+
+  return isMobile;
+}
+
 export default function Students() {
   const { user } = useAuth();
   const [students, setStudents] = useState([]);
@@ -41,6 +57,8 @@ export default function Students() {
 
   const isStaff = user?.role?.toLowerCase() === 'admin' || user?.role?.toLowerCase() === 'teacher';
   const isAdmin = user?.role?.toLowerCase() === 'admin';
+
+  const isMobile = useIsMobile(); // ✅ NEW
 
   const [search, setSearch] = useState('');
   const [filterClass, setFilterClass] = useState('all');
@@ -226,10 +244,17 @@ export default function Students() {
     }
   };
 
+  // ✅ FIX: wrapped in try/catch so a failed delete (e.g. network error)
+  // shows a message instead of an unhandled crash.
   const handleDelete = async (id) => {
     if (!window.confirm('Delete this student?')) return;
-    await deleteStudent(id);
-    fetchStudents();
+    try {
+      await deleteStudent(id);
+      fetchStudents();
+    } catch (err) {
+      console.error('Delete error:', err);
+      alert('Failed to delete student: ' + (err.message || 'Unknown error'));
+    }
   };
 
   // ✅ NEW: Function to trigger sync from UI
@@ -269,6 +294,66 @@ export default function Students() {
 
   const classes = ['1','2','3','4','5','6','7','8'];
   const sections = ['A'];
+
+  // ✅ NEW: one card per student for mobile — used instead of the
+  // wide desktop table when viewport < 641px.
+  const renderStudentCards = () => (
+    <div className="student-cards">
+      {students.map((s, index) => {
+        const attStatus = todayAttendance[s._id];
+        return (
+          <div key={s._id} className="student-card">
+            <div className="student-card-top">
+              <div>
+                <div className="student-card-name">{s.name}</div>
+                <div className="student-card-roll">
+                  Roll {s.rollNumber} &nbsp;·&nbsp; Class {s.class}-{s.section}
+                </div>
+              </div>
+              <button
+                onClick={() => toggleAttendance(s)}
+                className={`badge student-card-att ${
+                  !attStatus ? 'badge-blue' :
+                  attStatus === 'P' ? 'badge-green' : 'badge-red'
+                }`}
+              >
+                {!attStatus ? 'Mark' : attStatus === 'P' ? 'P' : 'A'}
+              </button>
+            </div>
+
+            <div className="student-card-meta">
+              {s.penNo && <span>PEN: {s.penNo}</span>}
+              <span>{s.gender}</span>
+              {s.parentName && <span>Parent: {s.parentName}</span>}
+            </div>
+
+            {s.contact && (
+              <div className="student-card-contact">
+                <span>{s.contact}</span>
+                <a
+                  href={`https://wa.me/91${s.contact}?text=Hello, this is regarding student ${s.name} (Roll: ${s.rollNumber}) from Savita Bal Shiksha Niketan.`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="student-card-whatsapp"
+                  title="Message on WhatsApp"
+                >
+                  💬 WhatsApp
+                </a>
+              </div>
+            )}
+
+            {user?.role?.toLowerCase() === 'admin' && (
+              <div className="student-card-actions">
+                <button className="btn btn-ghost" onClick={() => openEdit(s)}>✏️ Edit</button>
+                <button className="btn btn-ghost" style={{ color: 'var(--green)' }} onClick={() => openFeeModal(s)}>💰 Fee</button>
+                <button className="btn btn-danger" onClick={() => handleDelete(s._id)}>🗑️ Del</button>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
 
   // RBAC: Student/Parent Profile View
   if (!isStaff && !loading) {
@@ -322,6 +407,16 @@ export default function Students() {
 
   return (
     <div>
+      {/* ✅ NEW: caps the Add/Edit/Fee modal width on small phones so it
+          never overflows the viewport (same fix applied on Fees page). */}
+      <style>
+        {`
+          @media (max-width: 768px) {
+            .modal { width: 92vw !important; max-width: 92vw !important; }
+          }
+        `}
+      </style>
+
       <div className="page-header" style={{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:'16px', marginBottom: '20px'}}>
         <div style={{ flex: '1 1 300px' }}>
           <h1>Students</h1>
@@ -455,6 +550,8 @@ export default function Students() {
             <div className="icon">👥</div>
             <p>No students found</p>
           </div>
+        ) : isMobile ? (
+          renderStudentCards()
         ) : (
           <div className="table-wrap">
             <table>

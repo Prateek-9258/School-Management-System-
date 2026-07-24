@@ -1,6 +1,5 @@
 /* Attendance Component Styles */
 
-/* CSS Variables - Adjust to match your design system */
 :root {
   --accent: #4f8ef7;
   --surface: #0f172a;
@@ -10,6 +9,13 @@
   --green: #22c55e;
   --red: #ef4444;
   --text: #f1f5f9;
+
+  /* ✅ Single source of truth for column widths — used by BOTH
+     header row and every student row via the same JS variable,
+     so columns can never go out of sync (desktop grid) */
+  --col-name: 110px;
+  --col-date: 60px;
+  --col-total: 80px;
 }
 
 /* Page Header */
@@ -32,6 +38,17 @@
   font-size: 14px;
 }
 
+@media (max-width: 768px) {
+  .page-header {
+    flex-direction: column;
+    gap: 12px;
+  }
+  .page-header > div:last-child {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+
 /* Filter Selects */
 .filter-select {
   padding: 8px 12px;
@@ -43,6 +60,8 @@
   cursor: pointer;
   outline: none;
   transition: border-color 0.2s;
+  flex: 1;
+  min-width: 120px;
 }
 
 .filter-select:hover,
@@ -60,108 +79,286 @@
   background: var(--surface);
   border-radius: 12px;
   border: 1px solid var(--border);
-  overflow: hidden;
 }
 
-/* Table Styles */
-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 12px;
+/* ===== DESKTOP: GRID-BASED ATTENDANCE TABLE ===== */
+/* Used only when viewport >= 641px (see Attendance.jsx useIsMobile). */
+
+.att-grid-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin-bottom: 24px;
 }
 
-th {
-  padding: 8px 4px;
-  text-align: center;
-  background: var(--surface2);
+.att-grid {
+  display: flex;
+  flex-direction: column;
+  width: max-content;
+  min-width: 100%;
+}
+
+.att-row {
+  display: grid;
+  align-items: stretch;
+}
+
+.att-header-row {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+}
+
+.att-cell {
+  padding: 4px 3px;
   border-bottom: 1px solid var(--border);
   border-right: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+.att-header-cell {
+  padding: 8px 4px;
+  background: var(--surface2);
   font-weight: 600;
   color: var(--muted);
   font-size: 11px;
   white-space: nowrap;
+  flex-direction: column;
 }
 
-th:first-child {
+.att-day-label {
+  font-size: 10px;
+}
+
+.att-day-num {
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.att-today {
+  background: var(--accent) !important;
+  color: #fff !important;
+}
+
+.att-sunday {
+  background: rgba(239, 68, 68, 0.1) !important;
+  color: var(--red) !important;
+}
+
+.att-sticky-col {
   position: sticky;
   left: 0;
   z-index: 2;
-  background: var(--surface2);
+  text-align: left;
+  justify-content: flex-start;
+  padding: 6px 10px;
+  font-weight: 500;
+  flex-direction: column;
+  align-items: flex-start;
+  background: var(--surface);
+  will-change: transform;
+  transform: translateZ(0);
 }
 
-td {
-  padding: 4px 3px;
-  border-bottom: 1px solid var(--border);
-  border-right: 1px solid var(--border);
-  vertical-align: middle;
+.att-header-row .att-sticky-col {
+  z-index: 4;
+  background: var(--surface2);
+  justify-content: center;
+  align-items: center;
   text-align: center;
 }
 
-td:first-child {
-  position: sticky;
-  left: 0;
-  z-index: 1;
-  background: var(--surface);
+.att-student-name {
+  color: var(--text);
 }
 
-/* Row Styling */
-tbody tr:nth-child(even) td:first-child {
-  background: var(--surface2);
+.att-student-roll {
+  font-size: 11px;
+  color: var(--muted);
 }
 
-tbody tr:hover td {
-  background: rgba(79, 142, 247, 0.05);
+.att-btn-group {
+  display: flex;
+  gap: 3px;
+  align-items: center;
+  justify-content: center;
 }
 
-tbody tr:hover td:first-child {
-  background: rgba(79, 142, 247, 0.08);
-}
-
-/* Status Buttons */
-.status-btn {
-  width: 22px;
-  height: 22px;
-  border-radius: 5px;
+.att-btn {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
   border: 1px solid var(--border);
   cursor: pointer;
   font-weight: 700;
   font-size: 11px;
   background: transparent;
   color: var(--muted);
-  transition: all 0.1s ease;
   line-height: 1;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  transition: all 0.1s ease;
+  flex-shrink: 0;
 }
 
-.status-btn:hover {
+.att-btn:hover {
   transform: scale(1.1);
 }
 
-.status-btn.present {
+.att-btn-present {
   border: 2px solid var(--green);
   background: rgba(34, 197, 94, 0.2);
   color: var(--green);
 }
 
-.status-btn.absent {
+.att-btn-absent {
   border: 2px solid var(--red);
   background: rgba(239, 68, 68, 0.2);
   color: var(--red);
 }
 
-/* Summary Column */
-.summary-cell {
-  font-weight: 600;
+.att-present-count {
+  color: var(--green);
   font-size: 12px;
+  font-weight: 600;
 }
 
-.summary-cell .present-count {
+.att-absent-count {
+  color: var(--red);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* ===== MOBILE: CARD-PER-STUDENT VIEW ===== */
+/* Used only when viewport < 641px (see Attendance.jsx useIsMobile). */
+
+.att-cards-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 24px;
+}
+
+.att-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.att-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.att-card-name {
+  color: var(--text);
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.att-card-roll {
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+.att-card-summary {
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  padding-top: 2px;
+}
+
+/* Horizontally scrolling strip of day chips inside each card */
+.att-card-days {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 4px;
+}
+
+.att-card-days::-webkit-scrollbar {
+  height: 5px;
+}
+
+.att-card-days::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+
+/* Each day is one compact tap-to-cycle button:
+   blank -> Present -> Absent -> blank */
+.att-day-chip {
+  flex: 0 0 auto;
+  width: 42px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 6px 2px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  cursor: pointer;
+  transition: all 0.1s ease;
+}
+
+.att-day-chip:active {
+  transform: scale(0.95);
+}
+
+.att-day-chip-label {
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.att-day-chip-status {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--border);
+}
+
+.att-chip-present .att-day-chip-status,
+.att-day-chip-status.att-chip-present {
+  border: 2px solid var(--green);
+  background: rgba(34, 197, 94, 0.2);
   color: var(--green);
 }
 
-.summary-cell .absent-count {
+.att-chip-absent .att-day-chip-status,
+.att-day-chip-status.att-chip-absent {
+  border: 2px solid var(--red);
+  background: rgba(239, 68, 68, 0.2);
+  color: var(--red);
+}
+
+.att-chip-today {
+  border-color: var(--accent);
+}
+
+.att-chip-today .att-day-chip-label {
+  color: var(--accent);
+}
+
+.att-chip-sunday .att-day-chip-label {
   color: var(--red);
 }
 
@@ -286,56 +483,21 @@ tbody tr:hover td:first-child {
 }
 
 /* Scrollbar Styling */
-.card::-webkit-scrollbar {
+.att-grid-wrap::-webkit-scrollbar {
   height: 8px;
 }
 
-.card::-webkit-scrollbar-track {
+.att-grid-wrap::-webkit-scrollbar-track {
   background: var(--surface);
 }
 
-.card::-webkit-scrollbar-thumb {
+.att-grid-wrap::-webkit-scrollbar-thumb {
   background: var(--border);
   border-radius: 4px;
 }
 
-.card::-webkit-scrollbar-thumb:hover {
+.att-grid-wrap::-webkit-scrollbar-thumb:hover {
   background: var(--muted);
-}
-
-/* Responsive */
-@media (max-width: 768px) {
-  .page-header {
-    flex-direction: column;
-    gap: 12px;
-  }
-
-  .page-header > div:last-child {
-    width: 100%;
-    justify-content: flex-end;
-  }
-
-  .filter-select {
-    flex: 1;
-    min-width: 120px;
-  }
-
-  th:first-child,
-  td:first-child {
-    min-width: 100px !important;
-  }
-}
-
-/* Today Column Highlight */
-.today-col {
-  background: var(--accent) !important;
-  color: white !important;
-}
-
-/* Sunday Column Highlight */
-.sunday-col {
-  background: rgba(239, 68, 68, 0.1) !important;
-  color: var(--red) !important;
 }
 
 /* Save Success Animation */
