@@ -9,7 +9,9 @@ require('dotenv').config();
 
 const app = express();
 
-// ✅ CORS
+// ============================================
+// ✅ MIDDLEWARE
+// ============================================
 app.use(cors({
   origin: '*',
   credentials: true,
@@ -20,7 +22,9 @@ app.use(cors({
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-// ✅ MongoDB
+// ============================================
+// ✅ MONGODB
+// ============================================
 mongoose.connect(process.env.MONGODB_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
@@ -30,14 +34,20 @@ mongoose.connect(process.env.MONGODB_URI, {
 .then(() => console.log('✅ MongoDB Atlas Connected'))
 .catch(err => console.error('❌ MongoDB Error:', err.message));
 
-// ✅ Web Push VAPID Setup
+// ============================================
+// ✅ WEB PUSH VAPID SETUP
+// ============================================
 webpush.setVapidDetails(
   process.env.VAPID_SUBJECT || 'mailto:admin@school.com',
   process.env.VAPID_PUBLIC_KEY,
   process.env.VAPID_PRIVATE_KEY
 );
 
-// ✅ Save Subscription API
+// ============================================
+// ✅ API ROUTES
+// ============================================
+
+// Push Notification APIs
 app.post('/api/push/subscribe', async (req, res) => {
   try {
     const { subscription, userId } = req.body;
@@ -63,7 +73,6 @@ app.post('/api/push/subscribe', async (req, res) => {
   }
 });
 
-// ✅ Send Push Notification API
 app.post('/api/push/send', async (req, res) => {
   try {
     const { title, body, icon, url, userId } = req.body;
@@ -114,7 +123,6 @@ app.post('/api/push/send', async (req, res) => {
   }
 });
 
-// ✅ Get VAPID Public Key - Multiple paths for compatibility
 app.get('/api/push/vapid-public-key', (req, res) => {
   res.json({ publicKey: process.env.VAPID_PUBLIC_KEY });
 });
@@ -123,13 +131,14 @@ app.get('/api/announcements/vapid-public-key', (req, res) => {
   res.json({ publicKey: process.env.VAPID_PUBLIC_KEY });
 });
 
-// ✅ Dynamic Route Loading
+// ============================================
+// ✅ DYNAMIC ROUTE LOADING
+// ============================================
 const routesDir = path.join(__dirname, 'routes');
 
 if (fs.existsSync(routesDir)) {
   fs.readdirSync(routesDir).forEach(file => {
     if (file.endsWith('.js')) {
-      // ✅ Skip redundant or broken route files
       if (file === 'notificationRoutes.js' || file === 'Announcements.js') return;
 
       const routeName = file.replace('.js', '');
@@ -146,16 +155,12 @@ if (fs.existsSync(routesDir)) {
       
       try {
         const routeModule = require(`./routes/${file}`);
-        
-        // ✅ Fix: Handle both CommonJS and ES Module exports
         const router = routeModule.default || routeModule;
 
-        // ✅ Fix: Ensure the export is a valid middleware function/router
         if (typeof router === 'function') {
           app.use(routePath, router);
           console.log(`✅ Route loaded: ${routePath} → ${file}`);
         } else {
-          // Log specific error for the file instead of crashing Express
           throw new Error(`Module in "${file}" does not export a valid Express router function. Check "module.exports".`);
         }
       } catch (err) {
@@ -167,23 +172,67 @@ if (fs.existsSync(routesDir)) {
   console.error('❌ Routes directory not found:', routesDir);
 }
 
-// ✅ Health check
+// ============================================
+// ✅ HEALTH CHECK
+// ============================================
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// ✅ Global Error Handler
+// ============================================
+// ✅ SERVE REACT FRONTEND (STATIC FILES)
+// ============================================
+// Adjust path: use '../frontend/build' if server.js is in /backend/
+// Use 'frontend/build' if server.js is at project root
+const buildPath = path.join(__dirname, '..', 'frontend', 'build');
+
+if (fs.existsSync(buildPath)) {
+  // Serve static files (JS, CSS, images) with correct MIME types
+  app.use(express.static(buildPath, {
+    setHeaders: (res, filePath) => {
+      if (filePath.endsWith('.js')) {
+        res.setHeader('Content-Type', 'application/javascript');
+      } else if (filePath.endsWith('.css')) {
+        res.setHeader('Content-Type', 'text/css');
+      }
+    }
+  }));
+
+  // Serve index.html for all non-API routes (React Router support)
+  app.get('*', (req, res, next) => {
+    // Don't intercept API 404s - let them fall through
+    if (req.path.startsWith('/api/')) {
+      return next();
+    }
+    res.sendFile(path.join(buildPath, 'index.html'));
+  });
+
+  console.log('✅ Serving React frontend from:', buildPath);
+} else {
+  console.warn('⚠️ Frontend build not found at:', buildPath);
+}
+
+// ============================================
+// ✅ 404 HANDLER (API routes only)
+// ============================================
+app.use((req, res) => {
+  res.status(404).json({ 
+    success: false, 
+    message: `Route not found: ${req.method} ${req.path}` 
+  });
+});
+
+// ============================================
+// ✅ GLOBAL ERROR HANDLER
+// ============================================
 app.use((err, req, res, next) => {
   console.error('Global error:', err);
   res.status(500).json({ success: false, message: 'Internal server error', error: err.message });
 });
 
-// ✅ 404 Handler
-app.use((req, res) => {
-  res.status(404).json({ success: false, message: `Route not found: ${req.method} ${req.path}` });
-});
-
-// ✅ Port
+// ============================================
+// ✅ START SERVER
+// ============================================
 const PORT = process.env.PORT || 10000;
 
 app.listen(PORT, '0.0.0.0', () => {
